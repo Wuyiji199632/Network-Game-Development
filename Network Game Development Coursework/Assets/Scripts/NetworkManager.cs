@@ -13,7 +13,6 @@ public class NetworkManager : MonoBehaviour
     private static extern void SetLogCallback(LogCallback callback);// This is the function used for callback of debugging
 
 
-
     [DllImport("NetworkAccess")]
     private static extern void InitializeServer();
 
@@ -23,7 +22,6 @@ public class NetworkManager : MonoBehaviour
 
     [DllImport("NetworkAccess")]
     private static extern void ConnectToServer();
-
 
 
     // This delegate matches the C++ callback signature
@@ -39,8 +37,8 @@ public class NetworkManager : MonoBehaviour
     {
         SetLogCallback(LogFromDLL);
         InitializeServer();
-        InitializeClient();
-        ConnectToServer();
+        //InitializeClient();
+        //ConnectToServer();
 
 
 

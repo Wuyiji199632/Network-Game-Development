@@ -10,7 +10,8 @@
 // add headers that you want to pre-compile here
 #include "framework.h"
 #include <iostream>
-
+#include <WinSock2.h>
+#include <winsock.h>
 
 typedef void (*LogCallback)(const char* message);
 

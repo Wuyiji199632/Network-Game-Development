@@ -3,13 +3,14 @@
 #include "Server.h"
 #include "Client.h"
 
+/*Server Codes*/
 extern "C" {
 
     __declspec(dllexport) void InitializeServer();
 
 }
 
-
+/*Client Codes*/
 extern "C" {
 
     __declspec(dllexport) void InitializeClient();
