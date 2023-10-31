@@ -2,7 +2,7 @@
 #include "Server.h"
 #include <WinSock2.h>
 #include <winsock.h>
-
+#include <random>
 
 
 
@@ -33,9 +33,17 @@ void InitializeServer()
     struct sockaddr_in serverService;
     serverService.sin_family = AF_INET;
     serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces with randomized IP address
-    serverService.sin_port = htons(55555); // Use port number 55555 (or any other port you prefer)
+
+    
+    std::random_device rd; 
+    std::mt19937 gen(rd()); 
+    std::uniform_int_distribution<> distrib(49152, 65535);//Generate a random port number 
+
+    int randomPort = distrib(gen);
+    serverService.sin_port = htons(randomPort); //Bind the generated port number to the server socket
 
     if (bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
+
         if (logCallback != nullptr) {
             logCallback("Bind failed.");
         }
