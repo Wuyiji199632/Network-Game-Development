@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
 public class BanditScript : MonoBehaviour
 {
     public float moveSpeed = 5.0f,jumpForce=10.0f;

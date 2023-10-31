@@ -1,8 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 using System.Runtime.InteropServices;
-using static UnityEngine.Application;
+using UnityEngine.UIElements;
 
 public class NetworkManager : MonoBehaviour
 {
@@ -22,7 +23,8 @@ public class NetworkManager : MonoBehaviour
 
     [DllImport("NetworkAccess")]
     private static extern void ConnectToServer();
-
+    [DllImport("NetworkAccess")]
+    private static extern void BroadcastBanditSelection(string playerID, string banditType);
 
     // This delegate matches the C++ callback signature
     public delegate void LogCallback(string message);
@@ -32,6 +34,10 @@ public class NetworkManager : MonoBehaviour
     {
         Debug.Log(message);
     }
+
+    public Button selectHeavyBanditBtn, selectLightBanditBtn, confirmBtn;
+    
+    private string selectedBanditType = "";
     // Start is called before the first frame update
     void Start()
     {
@@ -40,6 +46,7 @@ public class NetworkManager : MonoBehaviour
         //InitializeClient();
         //ConnectToServer();
 
+       
 
 
     }
@@ -48,5 +55,26 @@ public class NetworkManager : MonoBehaviour
     void Update()
     {
         
+    }
+
+    public void SelectBandit(string banditType)
+    {
+        selectedBanditType = banditType;
+    }
+
+    public void ConfirmSelection()
+    {
+        if (!string.IsNullOrEmpty(selectedBanditType))
+        {
+            // Ideally, you'd have a unique playerID for each player.
+            // This is a placeholder; replace with your playerID generation method.
+            string playerID = "Player_" + UnityEngine.Random.Range(1000, 9999);
+
+            BroadcastBanditSelection(playerID, selectedBanditType);
+        }
+        else
+        {
+            Debug.LogWarning("No bandit type selected.");
+        }
     }
 }

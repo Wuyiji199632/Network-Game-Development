@@ -69,3 +69,8 @@ void InitializeServer()
 	}
 	
 }
+
+void BroadcastBanditSelection(const char* playerID, const char* banditType)
+{
+
+}
