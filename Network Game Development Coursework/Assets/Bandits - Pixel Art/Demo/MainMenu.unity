@@ -1572,7 +1572,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4532010117622913}
-  - component: {fileID: 114204723614987837}
   - component: {fileID: 61751993914135389}
   m_Layer: 0
   m_Name: GroundSensor
@@ -1630,7 +1629,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4269114315635068}
-  - component: {fileID: 114926350229617364}
   - component: {fileID: 61368514527620904}
   m_Layer: 0
   m_Name: GroundSensor
@@ -1887,30 +1885,6 @@ Animator:
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorControllerStateOnDisable: 0
---- !u!114 &114204723614987837
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1287205958005095}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4beb47d3f52622a4db6bba0f8809ce39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &114926350229617364
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1943393512450390}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4beb47d3f52622a4db6bba0f8809ce39, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!212 &212259381695310196
 SpriteRenderer:
   m_ObjectHideFlags: 0
