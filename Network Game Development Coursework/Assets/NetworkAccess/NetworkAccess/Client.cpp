@@ -6,6 +6,8 @@ void InitializeClient()
 {
 	//cout << "Client Initialized!" << endl;
 
+
+
 	if (logCallback != nullptr) {
 
 		logCallback("Client Initialized");

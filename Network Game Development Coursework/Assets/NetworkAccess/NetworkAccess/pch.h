@@ -10,6 +10,7 @@
 // add headers that you want to pre-compile here
 #include "framework.h"
 #include <iostream>
+#include <string>
 #include <WinSock2.h>
 #include <winsock.h>
 

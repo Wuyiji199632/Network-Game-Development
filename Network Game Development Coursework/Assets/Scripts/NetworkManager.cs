@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 using System.Runtime.InteropServices;
-using UnityEngine.UIElements;
-
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class NetworkManager : MonoBehaviour
 {
+    public bool isClient = true;
 
     /*External C++ Functions for Networking*/
 
@@ -38,7 +39,7 @@ public class NetworkManager : MonoBehaviour
 
     public Button selectHeavyBanditBtn, selectLightBanditBtn, confirmBtn;
     
-    private string selectedBanditType = "";
+    public string selectedBanditType = "";
     // Start is called before the first frame update
     void Start()
     {
@@ -47,9 +48,16 @@ public class NetworkManager : MonoBehaviour
         //InitializeClient();
         //ConnectToServer();
 
-       
 
-
+        if (isClient)
+        {
+            InitializeClient();
+            ConnectToServer();
+        }
+        else
+        {
+            InitializeServer();
+        }
     }
 
     // Update is called once per frame
@@ -61,15 +69,15 @@ public class NetworkManager : MonoBehaviour
     public void SelectBandit(string banditType)
     {
         selectedBanditType = banditType;
+        confirmBtn.gameObject.SetActive(true);
     }
 
     public void ConfirmSelection()
     {
         if (!string.IsNullOrEmpty(selectedBanditType))
         {
-            // Ideally, you'd have a unique playerID for each player.
-            // This is a placeholder; replace with your playerID generation method.
-            string playerID = "Player_" + UnityEngine.Random.Range(1000, 9999);
+           
+            string playerID = "Player_" + UnityEngine.Random.Range(1000, 9999).ToString();
 
             BroadcastBanditSelection(playerID, selectedBanditType);
         }
@@ -77,5 +85,13 @@ public class NetworkManager : MonoBehaviour
         {
             Debug.LogWarning("No bandit type selected.");
         }
+        //TODO: switch the game screen the the lobby room
+        SceneManager.LoadScene("LobbyRoom");
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
+        Debug.Log("Game Quitted");
     }
 }

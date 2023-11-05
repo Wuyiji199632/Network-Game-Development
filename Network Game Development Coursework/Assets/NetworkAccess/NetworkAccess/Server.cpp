@@ -3,6 +3,37 @@
 #include <WinSock2.h>
 #include <winsock.h>
 #include <random>
+#include <vector>
+#include <thread>
+#include <mutex>
+#include <string>
+// Global list of connected client sockets
+std::vector<SOCKET> connectedClients;
+std::mutex clientMutex;
+
+
+void AcceptClients(SOCKET listenSocket) {
+
+    while (true) {
+        // Accept incoming client connections
+        SOCKET clientSocket = INVALID_SOCKET;
+        clientSocket = accept(listenSocket, NULL, NULL);
+
+        if (clientSocket == INVALID_SOCKET) {
+            if (logCallback != nullptr) {
+                logCallback("Accepting client failed.");
+                logCallback(("Built with error: " + std::to_string(WSAGetLastError())).c_str());
+            }
+            
+            continue; // Keep trying to accept new clients
+        }
+
+        // Lock the mutex, add client to connected client list, and then unlock
+        clientMutex.lock();
+        connectedClients.push_back(clientSocket);
+        clientMutex.unlock();
+    }
+}
 
 
 
@@ -42,6 +73,7 @@ void InitializeServer()
     int randomPort = distrib(gen);
     serverService.sin_port = htons(randomPort); //Bind the generated port number to the server socket
 
+    //Bind to the server service socket
     if (bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
 
         if (logCallback != nullptr) {
@@ -51,17 +83,21 @@ void InitializeServer()
         WSACleanup();
         return;
     }
-
-    // 4. Listen for Client Connections
+    //Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
     if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
         if (logCallback != nullptr) {
-            logCallback("Listen failed.");
+            logCallback(("Listen failed with error: " + std::to_string(WSAGetLastError())).c_str());
         }
         closesocket(listenSocket);
         WSACleanup();
         return;
     }
-	
+
+   
+    // Start a new thread to accept clients
+    std::thread acceptThread(AcceptClients, listenSocket);
+    acceptThread.detach();  // Let it run independently
+
 	if (logCallback != nullptr) {
 
 		logCallback("Server Initialized and Listening For Incoming Clients!");
@@ -72,5 +108,17 @@ void InitializeServer()
 
 void BroadcastBanditSelection(const char* playerID, const char* banditType)
 {
+    // Create a message to send to clients
+    std::string message = std::string(playerID) + " selected " + banditType;
 
+    // Iterate through all connected clients and send them the message
+    for (SOCKET clientSocket : connectedClients) {
+        send(clientSocket, message.c_str(), message.length(), 0);
+    }
+
+    if (logCallback != nullptr) {
+        std::string logMessage = "Broadcasted bandit selection to all clients: " + message;
+        logCallback(logMessage.c_str());
+        
+    }
 }
