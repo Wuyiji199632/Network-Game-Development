@@ -49,6 +49,9 @@ public class NetworkManager : MonoBehaviour
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
     private static extern ushort QuerryServerPort();
 
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr QuerryServerIP(); //Hint: don't define it as a string type as memory management between c# and c++ are different
+
 
 
     // This delegate matches the C++ callback signature
@@ -83,10 +86,11 @@ public class NetworkManager : MonoBehaviour
         InitializeServer();
 
         ushort port=QuerryServerPort();
-
+        IntPtr ipPtr=QuerryServerIP();
+        string serverIP=Marshal.PtrToStringAnsi(ipPtr);
         if (port != 0)
         {
-            Debug.Log("Successfully accessed port number " + port);
+            Debug.Log("Successfully accessed port number " + port+" and ip: "+ serverIP);
         }
         else
         {

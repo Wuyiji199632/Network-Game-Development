@@ -24,7 +24,7 @@ SOCKET g_clientSocket = INVALID_SOCKET; //Global definition for the client socke
 
 
 // Helper function to get the first non-loopback IP address of this host.
-std::string GetLocalIPAddress() {
+/*std::string GetLocalIPAddress() {
     struct addrinfo hints, * info, * p;
     int result;
 
@@ -56,6 +56,51 @@ std::string GetLocalIPAddress() {
     }
 
     freeaddrinfo(info);
+    return ipAddress;
+}*/
+
+const char* GetLocalIPAddress() {
+    struct addrinfo hints, * info, * p;
+    int result;
+
+    char hostname[1024];
+    char ipstr[INET6_ADDRSTRLEN];
+    hostname[1023] = '\0';
+    gethostname(hostname, 1023);
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET; // AF_INET means IPv4 only addresses
+
+    result = getaddrinfo(hostname, NULL, &hints, &info);
+    if (result != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
+        exit(1);
+    }
+
+    char* ipAddress = nullptr;
+    for (p = info; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) { // IPv4
+            struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+            void* addr = &(ipv4->sin_addr);
+
+            // Convert the IP to a string and store it in ipstr
+            inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
+            size_t ipstr_len = strlen(ipstr) + 1;
+            ipAddress = new char[ipstr_len]; // Allocate memory for the IP address string
+            strcpy_s(ipAddress, ipstr_len, ipstr); // Use strcpy_s for secure string copy
+            break; // Only store the first IP address
+        }
+    }
+
+    freeaddrinfo(info);
+
+    if (ipAddress == nullptr) {
+        const char* notFoundMsg = "Not found";
+        size_t msgLen = strlen(notFoundMsg) + 1;
+        ipAddress = new char[msgLen];
+        strcpy_s(ipAddress, msgLen, notFoundMsg);
+    }
+
     return ipAddress;
 }
 
@@ -401,9 +446,9 @@ unsigned short QuerryServerPort() {
     
     return serverServicePort;
 }
-std::string QuerryServerIP()
+const char* QuerryServerIP()
 {
-    return std::string();
+    return GetLocalIPAddress();
 }
 bool ReceiveMessagesFromServer(SOCKET clientSocket)
 {

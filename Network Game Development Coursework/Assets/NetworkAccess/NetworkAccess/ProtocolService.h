@@ -34,6 +34,8 @@ extern "C" {
 
     __declspec(dllexport) unsigned short QuerryServerPort();
 
-    __declspec(dllexport) std::string QuerryServerIP();
+    //__declspec(dllexport) std::string QuerryServerIP();
+
+    __declspec(dllexport) const char* QuerryServerIP();
     
 }
