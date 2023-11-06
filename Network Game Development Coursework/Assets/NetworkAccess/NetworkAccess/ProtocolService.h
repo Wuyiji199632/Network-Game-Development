@@ -4,6 +4,7 @@
 #include <WinSock2.h>
 #include <winsock.h>
 #include <vector>
+#include <string>
 
 
 
@@ -32,5 +33,7 @@ extern "C" {
     __declspec(dllexport) SOCKET GetClientSocket();
 
     __declspec(dllexport) unsigned short QuerryServerPort();
+
+    __declspec(dllexport) std::string QuerryServerIP();
     
 }

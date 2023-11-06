@@ -14,11 +14,54 @@
 #include <ws2tcpip.h>
 
 
+
 // Global list of connected client sockets
 std::vector<SOCKET> connectedClients;
 std::mutex clientMutex;
-unsigned short serverServicePort; // To keep track of the server's service port
+unsigned short serverServicePort=0; // To keep track of the server's service port
+std::string serverIP="";
 SOCKET g_clientSocket = INVALID_SOCKET; //Global definition for the client socket
+
+
+// Helper function to get the first non-loopback IP address of this host.
+std::string GetLocalIPAddress() {
+    struct addrinfo hints, * info, * p;
+    int result;
+
+    char hostname[1024];
+    char ipstr[INET6_ADDRSTRLEN];
+    hostname[1023] = '\0';
+    gethostname(hostname, 1023);
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET; // AF_INET means IPv4 only addresses
+
+    result = getaddrinfo(hostname, NULL, &hints, &info);
+    if (result != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
+        exit(1);
+    }
+
+    std::string ipAddress;
+    for (p = info; p != NULL; p = p->ai_next) {
+        if (p->ai_family == AF_INET) { // IPv4
+            struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+            void* addr = &(ipv4->sin_addr);
+
+            // Convert the IP to a string and store it in ipstr
+            inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
+            ipAddress.assign(ipstr);
+            
+        }
+    }
+
+    freeaddrinfo(info);
+    return ipAddress;
+}
+
+
+
+
 std::string GenerateUniqueID() {
 
     std::random_device rd;
@@ -206,7 +249,7 @@ extern "C" void InitializeServer()
     // 7.Bind the Socket to an IP Address and Port generated randomly
     struct sockaddr_in serverService;
     serverService.sin_family = AF_INET;
-    serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces with randomized IP address
+    serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
 
     
     std::random_device rd; 
@@ -225,6 +268,28 @@ extern "C" void InitializeServer()
         closesocket(listenSocket);
         WSACleanup();
         return;
+    }
+    else {
+        // After binding, get the port number
+        struct sockaddr_in sin;
+        int addrlen = sizeof(sin);
+        if (getsockname(listenSocket, (struct sockaddr*)&sin, &addrlen) == 0 && sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
+
+            serverServicePort = ntohs(sin.sin_port);
+            serverIP = GetLocalIPAddress();
+            if (logCallback != nullptr) {
+                logCallback(("Server is listening on IP: " + serverIP + " Port: " + std::to_string(serverServicePort)).c_str());
+            }
+        }
+        else {
+
+            if (logCallback != nullptr) {
+                logCallback("Failed to get socket name.");
+            }
+            closesocket(listenSocket);
+            WSACleanup();
+            return;
+        }
     }
     //9.Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
     if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
@@ -246,10 +311,7 @@ extern "C" void InitializeServer()
 
 		logCallback("Server and query service are running.");
 		
-	}
-
-   
-	
+	}	
 }
 
 void BroadcastBanditSelection(const char* playerID, const char* banditType)
@@ -335,67 +397,13 @@ extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePor
 
 
 unsigned short QuerryServerPort() {
-
-    // Initialize socket details for the query
-    SOCKET querySocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (querySocket == INVALID_SOCKET) {
-        if (logCallback) {
-            logCallback("Socket creation failed to querrying");
-        }
-        return 0;
-    }
-
-    struct sockaddr_in queryAddr;
-    queryAddr.sin_family = AF_INET;
-    queryAddr.sin_port = htons(12345); 
-
+  
     
-    if (inet_pton(AF_INET, "127.0.0.1", &queryAddr.sin_addr) <= 0) {
-        if (logCallback) {
-            logCallback("Invalid Address!");
-        }
-        closesocket(querySocket);
-        return 0;
-    }
-
-    // Connect to the query service
-    if (connect(querySocket, (struct sockaddr*)&queryAddr, sizeof(queryAddr)) < 0) {
-        if (logCallback) {
-            logCallback("Connection Failed for querrying");
-        }
-        closesocket(querySocket);
-        return 0;
-    }
-
-    // Receive the port number from the query service
-    char portBuffer[10]; // Port numbers are at most 5 digits long
-    int bytesReceived = recv(querySocket, portBuffer, sizeof(portBuffer) - 1, 0);
-    if (bytesReceived <= 0) {
-        if (logCallback) {
-            logCallback("Failed to receive port number.");
-        }
-        closesocket(querySocket);
-        return 0;
-    }
-    portBuffer[bytesReceived] = '\0'; // Null-terminate the received string
-
-
-    // Ensure that the received string is a valid number
-    for (int i = 0; i < bytesReceived; ++i) {
-        if (!isdigit(portBuffer[i])) {
-            if (logCallback) {
-                logCallback("Received invalid port number.");
-            }
-            closesocket(querySocket);
-            return 0;
-        }
-    }
-
-
-
-    unsigned short serverPort = std::atoi(portBuffer);
-    closesocket(querySocket);
-    return serverPort;
+    return serverServicePort;
+}
+std::string QuerryServerIP()
+{
+    return std::string();
 }
 bool ReceiveMessagesFromServer(SOCKET clientSocket)
 {

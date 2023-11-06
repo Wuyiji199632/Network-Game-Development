@@ -82,9 +82,16 @@ public class NetworkManager : MonoBehaviour
 
         InitializeServer();
 
-        
-        
+        ushort port=QuerryServerPort();
 
+        if (port != 0)
+        {
+            Debug.Log("Successfully accessed port number " + port);
+        }
+        else
+        {
+            Debug.Log("Fail to retrieve port number!");
+        }
        
     }
 
