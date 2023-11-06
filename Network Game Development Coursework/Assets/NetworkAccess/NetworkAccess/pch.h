@@ -15,12 +15,19 @@
 #include <winsock.h>
 
 typedef void (*LogCallback)(const char* message);
+// Define the type of the function pointer for the callback for receiving messages from the server
+typedef void (*MessageReceivedCallback)(const char* message);
 
 extern LogCallback logCallback;
+// Declare a function pointer for the callback
+extern MessageReceivedCallback g_messageReceivedCallback;
+
 
 extern "C" {
 
 	__declspec(dllexport) void SetLogCallback(LogCallback callback);
+
+	__declspec(dllexport) void SetMessageReceivedCallback(MessageReceivedCallback callback);
 }
 
 

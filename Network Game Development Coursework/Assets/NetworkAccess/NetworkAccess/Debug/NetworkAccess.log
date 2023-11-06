@@ -1,0 +1,26 @@
+﻿     Creating library C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\Debug\NetworkAccess.lib and object C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\Debug\NetworkAccess.exp
+Client.obj : error LNK2019: unresolved external symbol __imp__closesocket@4 referenced in function "void __cdecl CleanupClient(void)" (?CleanupClient@@YAXXZ)
+QuerryServer.obj : error LNK2001: unresolved external symbol __imp__closesocket@4
+Server.obj : error LNK2001: unresolved external symbol __imp__closesocket@4
+Client.obj : error LNK2019: unresolved external symbol __imp__recv@16 referenced in function "bool __cdecl ReceiveMessagesFromServer(unsigned int)" (?ReceiveMessagesFromServer@@YA_NI@Z)
+QuerryServer.obj : error LNK2001: unresolved external symbol __imp__recv@16
+Client.obj : error LNK2019: unresolved external symbol __imp__WSACleanup@0 referenced in function "void __cdecl CleanupClient(void)" (?CleanupClient@@YAXXZ)
+QuerryServer.obj : error LNK2001: unresolved external symbol __imp__WSACleanup@0
+Server.obj : error LNK2001: unresolved external symbol __imp__WSACleanup@0
+Client.obj : error LNK2019: unresolved external symbol __imp__WSAGetLastError@0 referenced in function "bool __cdecl ReceiveMessagesFromServer(unsigned int)" (?ReceiveMessagesFromServer@@YA_NI@Z)
+QuerryServer.obj : error LNK2001: unresolved external symbol __imp__WSAGetLastError@0
+Server.obj : error LNK2001: unresolved external symbol __imp__WSAGetLastError@0
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__connect@12 referenced in function "public: bool __thiscall QueryServer::SetupConnection(void)" (?SetupConnection@QueryServer@@QAE_NXZ)
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__htons@4 referenced in function "public: bool __thiscall QueryServer::SetupConnection(void)" (?SetupConnection@QueryServer@@QAE_NXZ)
+Server.obj : error LNK2001: unresolved external symbol __imp__htons@4
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__send@16 referenced in function "public: bool __thiscall QueryServer::QueryPort(unsigned short &)" (?QueryPort@QueryServer@@QAE_NAAG@Z)
+Server.obj : error LNK2001: unresolved external symbol __imp__send@16
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__socket@12 referenced in function "public: bool __thiscall QueryServer::SetupConnection(void)" (?SetupConnection@QueryServer@@QAE_NXZ)
+Server.obj : error LNK2001: unresolved external symbol __imp__socket@12
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__WSAStartup@8 referenced in function "public: __thiscall QueryServer::QueryServer(class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > const &,unsigned short)" (??0QueryServer@@QAE@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@G@Z)
+Server.obj : error LNK2001: unresolved external symbol __imp__WSAStartup@8
+QuerryServer.obj : error LNK2019: unresolved external symbol __imp__inet_pton@12 referenced in function "public: bool __thiscall QueryServer::SetupConnection(void)" (?SetupConnection@QueryServer@@QAE_NXZ)
+Server.obj : error LNK2019: unresolved external symbol __imp__accept@12 referenced in function _AcceptClients
+Server.obj : error LNK2019: unresolved external symbol __imp__bind@12 referenced in function _InitializeServer
+Server.obj : error LNK2019: unresolved external symbol __imp__listen@8 referenced in function _InitializeServer
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\Debug\NetworkAccess.dll : fatal error LNK1120: 13 unresolved externals

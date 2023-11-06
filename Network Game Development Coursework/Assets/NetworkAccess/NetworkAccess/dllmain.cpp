@@ -1,23 +1,29 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
-#include "Server.h"
-#include "Client.h"
+#include "ProtocolService.h"
+#include "QuerryServer.h"
 
-/*Server Codes*/
+
 extern "C" {
 
     __declspec(dllexport) void InitializeServer();
 
-}
 
-/*Client Codes*/
-extern "C" {
-
-    __declspec(dllexport) void InitializeClient();
+    __declspec(dllexport) void InitializeClient(const char* queryServiceIP, int queryServicePort);
 
     __declspec(dllexport) void ConnectToServer();
 
+    __declspec(dllexport) void CleanupClient();
+
+    __declspec(dllexport) bool ReceiveMessagesFromServer(SOCKET clientSocket);
+
+    __declspec(dllexport) SOCKET GetClientSocket();
+
+    __declspec(dllexport) unsigned short QuerryServerPort();
+
 }
+
+
 
 
 
