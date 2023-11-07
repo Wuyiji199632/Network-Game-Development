@@ -12,7 +12,7 @@
 #include <sstream>
 #include <iomanip>
 #include <ws2tcpip.h>
-
+#include <atomic>
 
 
 // Global list of connected client sockets
@@ -22,42 +22,11 @@ unsigned short serverServicePort=0; // To keep track of the server's service por
 std::string serverIP="";
 SOCKET g_clientSocket = INVALID_SOCKET; //Global definition for the client socket
 
-
+/*Server sockets*/
+SOCKET listenSocket = INVALID_SOCKET;
+SOCKET queryServiceSocket = INVALID_SOCKET;
+ bool serverRunning = false;
 // Helper function to get the first non-loopback IP address of this host.
-/*std::string GetLocalIPAddress() {
-    struct addrinfo hints, * info, * p;
-    int result;
-
-    char hostname[1024];
-    char ipstr[INET6_ADDRSTRLEN];
-    hostname[1023] = '\0';
-    gethostname(hostname, 1023);
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET; // AF_INET means IPv4 only addresses
-
-    result = getaddrinfo(hostname, NULL, &hints, &info);
-    if (result != 0) {
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(result));
-        exit(1);
-    }
-
-    std::string ipAddress;
-    for (p = info; p != NULL; p = p->ai_next) {
-        if (p->ai_family == AF_INET) { // IPv4
-            struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
-            void* addr = &(ipv4->sin_addr);
-
-            // Convert the IP to a string and store it in ipstr
-            inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
-            ipAddress.assign(ipstr);
-            
-        }
-    }
-
-    freeaddrinfo(info);
-    return ipAddress;
-}*/
 
 const char* GetLocalIPAddress() {
     struct addrinfo hints, * info, * p;
@@ -104,7 +73,43 @@ const char* GetLocalIPAddress() {
     return ipAddress;
 }
 
+// Function to handle incoming queries
+void HandleQueryService(SOCKET queryServiceSocket) {
+    struct sockaddr_in clientAddr;
+    int clientAddrSize = sizeof(clientAddr);
 
+    while (true) {
+        SOCKET querySocket = accept(queryServiceSocket, (struct sockaddr*)&clientAddr, &clientAddrSize);
+        if (querySocket == INVALID_SOCKET) {
+            int error = WSAGetLastError();
+            if (error != WSAEWOULDBLOCK) {
+                // Actual error handling
+                logCallback("Accept failed on query service socket.");
+                break;
+            }
+            // WSAEWOULDBLOCK just means there are no connections to accept right now
+            // You might want to sleep here to prevent a busy loop
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+
+        // Handle the accepted socket (querySocket) normally
+        // Send the actual server service port to the client
+        std::string portString = std::to_string(serverServicePort);
+        int bytesSent = send(querySocket, portString.c_str(), portString.length(), 0);
+        if (bytesSent == SOCKET_ERROR) {
+            int sendError = WSAGetLastError();
+            if (sendError != WSAEWOULDBLOCK) {
+                // Handle send error
+                logCallback("Send failed on query service socket.");
+                closesocket(querySocket);
+                continue;
+            }
+            // WSAEWOULDBLOCK just means the send would block, you can retry or handle as needed
+        }
+        closesocket(querySocket);
+    }
+}
 
 
 std::string GenerateUniqueID() {
@@ -144,30 +149,42 @@ void NotifyClientJoined(const SOCKET& clientSocket)
 }
 void AcceptClients(SOCKET listenSocket) {
 
-    while (true) {
+    while (serverRunning) {
         // Accept incoming client connections
-        SOCKET clientSocket = INVALID_SOCKET;
-        clientSocket = accept(listenSocket, NULL, NULL);
-        std::string clientID = GenerateUniqueID();
+        SOCKET clientSocket = accept(listenSocket, NULL, NULL);
+
         if (clientSocket == INVALID_SOCKET) {
-            if (logCallback != nullptr) {
-                logCallback("Accepting client failed.");
-                logCallback(("Built with error: " + std::to_string(WSAGetLastError())).c_str());
+            int error = WSAGetLastError();
+            if (error == WSAEWOULDBLOCK) {
+                // No pending connections, just continue and try again.
+                // Introduce some delay to prevent spinning too fast and consuming CPU.
+                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100 ms delay
+                continue;
             }
-            
-            continue; // Keep trying to accept new clients
+            else {
+                // An actual error occurred.
+                if (logCallback != nullptr) {
+                    logCallback("Accepting client failed.");
+                    logCallback(("Accept failed with error: " + std::to_string(error)).c_str());
+                }
+                // Depending on the design, you might want to break out of the loop and terminate the server
+                // or just continue after logging the error.
+                continue;
+            }
         }
 
-        // Lock the mutex, add a client to connected client list, and then unlock to make the operation thread-safe. Ensure only one thread handles accepting one client and add it to the client list
+        // At this point, clientSocket is valid
+        std::string clientID = GenerateUniqueID();
+
+        // Lock the mutex, add the client to the connected client list, then unlock.
         std::lock_guard<std::mutex> guard(clientMutex);
         connectedClients.push_back(clientSocket);
-        //If the number of clients is out of the scope, the lock will be automatically released
-       
+        // Client is now successfully added, log or process as needed.
        
     }
 }
 
-int BindSocketWithRetry(SOCKET& socket, struct sockaddr_in& serviceAddr, int retries = 10) {
+int BindSocketWithRetry(SOCKET& socket, struct sockaddr_in& serviceAddr, int retries = 10, int retryDelayMilliseconds = 100) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> distrib(39432, 69432);
@@ -177,8 +194,13 @@ int BindSocketWithRetry(SOCKET& socket, struct sockaddr_in& serviceAddr, int ret
         serviceAddr.sin_port = htons(randomPort);
 
         if (bind(socket, (struct sockaddr*)&serviceAddr, sizeof(serviceAddr)) == SOCKET_ERROR) {
-            logCallback(("Bind failed on port: " + std::to_string(randomPort) + ", retrying...").c_str());
+            int lastError = WSAGetLastError();
+            logCallback(("Bind failed on port: " + std::to_string(randomPort) + " with error: " + std::to_string(lastError) + ", retrying...").c_str());
             --retries;
+            if (retries > 0) {
+                // If not the last retry, wait a bit before retrying
+                std::this_thread::sleep_for(std::chrono::milliseconds(retryDelayMilliseconds));
+            }
         }
         else {
             // Bind successful
@@ -195,8 +217,7 @@ int BindSocketWithRetry(SOCKET& socket, struct sockaddr_in& serviceAddr, int ret
 extern "C" void InitializeServer()
 {
     WSADATA wsaData;
-    SOCKET listenSocket = INVALID_SOCKET;
-    SOCKET queryServiceSocket = INVALID_SOCKET; // Socket for the query service
+    serverRunning = true;
     // 1. Initialize Winsock
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (result != 0) {
@@ -216,6 +237,20 @@ extern "C" void InitializeServer()
         return;
     }
 
+    // Set non-blocking mode for the listening socket
+    unsigned long mode = 1;
+    result = ioctlsocket(listenSocket, FIONBIO, &mode);
+    if (result != NO_ERROR) {
+        if (logCallback != nullptr) {
+            logCallback("Failed to set listenSocket to non-blocking mode.");
+        }
+        closesocket(listenSocket);
+        WSACleanup();
+        return;
+    }
+    
+
+
     // 3.Create a socket for the query service to listen to client queries
     queryServiceSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (queryServiceSocket == INVALID_SOCKET) {
@@ -225,8 +260,20 @@ extern "C" void InitializeServer()
         return;
     }
 
+    // Set non-blocking mode for the query service socket
+    result = ioctlsocket(queryServiceSocket, FIONBIO, &mode);
+    if (result != NO_ERROR) {
+        if (logCallback) {
+            logCallback("Failed to set queryServiceSocket to non-blocking mode.");
+        }
+        closesocket(listenSocket);
+        closesocket(queryServiceSocket);
+        WSACleanup();
+        return;
+    }
     
-    // 4.Bind the query service socket to a well-known port
+    
+    // 4.Bind the query service socket to a well-known port or a randomly generated port depending on the application's settings
      
     struct sockaddr_in service;
     service.sin_family = AF_INET;
@@ -241,7 +288,7 @@ extern "C" void InitializeServer()
     struct sockaddr_in queryServiceAddr = { 0 };
     queryServiceAddr.sin_family = AF_INET;
     queryServiceAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    queryServiceAddr.sin_port = htons(randomPortNum); // bind the random port number
+    queryServiceAddr.sin_port = htons(5555); // bind the random port number
 
     if (bind(queryServiceSocket, (struct sockaddr*)&queryServiceAddr, sizeof(queryServiceAddr)) == SOCKET_ERROR) {
         /* logCallback("Bind for query service failed.");
@@ -272,26 +319,22 @@ extern "C" void InitializeServer()
     }
 
     // 6.Start a thread for the query service to handle incoming queries
-    std::thread queryServiceThread([queryServiceSocket]() {
-        struct sockaddr_in clientAddr;
-        int clientAddrSize = sizeof(clientAddr);
+    std::thread queryServiceThread(HandleQueryService, queryServiceSocket);
+    if (queryServiceThread.joinable()) {
 
-        while (true) {
+        queryServiceThread.detach(); // Let the query service thread run independently
+    }
+    else {
 
-            SOCKET querySocket = accept(queryServiceSocket, (struct sockaddr*)&clientAddr, &clientAddrSize);
-            if (querySocket != INVALID_SOCKET) {
-                // Send the actual server service port to the client
-                std::string portString = std::to_string(serverServicePort);
-                send(querySocket, portString.c_str(), portString.length(), 0);
-                closesocket(querySocket);
-            }
+        if (logCallback) {
+
+            logCallback("Could not create query service thread.");
+            // Cleanup code
         }
-        });
-    queryServiceThread.detach(); // Let the query service thread run independently
+       
+    }
 
-    
-
-    // 7.Bind the Socket to an IP Address and Port generated randomly
+    // 7.Bind the Socket to an IP Address and Port 
     struct sockaddr_in serverService;
     serverService.sin_family = AF_INET;
     serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
@@ -299,10 +342,10 @@ extern "C" void InitializeServer()
     
     std::random_device rd; 
     std::mt19937 gen(rd()); 
-    std::uniform_int_distribution<> distrib(49152, 65535);//Generate a random port number 
+    std::uniform_int_distribution<> distrib(39412, 69853);//Generate a random port number 
 
     int randomPort = distrib(gen);
-    serverService.sin_port = htons(randomPort); //Bind the generated port number to the server socket
+    serverService.sin_port = htons(8888); //Bind the generated port number to the server socket
 
     //8.Bind to the server service socket
     if (bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
@@ -348,15 +391,54 @@ extern "C" void InitializeServer()
 
    
     //10. Start a new thread to accept clients so that the process does not block that for binding port and listening for clients
+   
     std::thread acceptThread(AcceptClients, listenSocket);
-    acceptThread.detach();  // Let it run independently
-    
+    if (acceptThread.joinable()) {
+        acceptThread.detach();  // Let it run independently
+    }
+    else {
+        if(logCallback){
 
+            logCallback("Could not create accept thread.");
+                  
+        }      
+    }
+    
 	if (logCallback != nullptr) {
 
 		logCallback("Server and query service are running.");
 		
 	}	
+}
+
+extern "C" void CleanUpServer()
+{
+    serverRunning = false;
+    // Close the query service socket if it's valid
+    if (queryServiceSocket != INVALID_SOCKET) {
+        closesocket(queryServiceSocket);
+        queryServiceSocket = INVALID_SOCKET;
+    }
+
+    // Close the listen socket if it's valid
+    if (listenSocket != INVALID_SOCKET) {
+        closesocket(listenSocket);
+        listenSocket = INVALID_SOCKET;
+    }
+
+    // Perform cleanup on all client sockets
+    for (auto& socket : connectedClients) {
+        if (socket != INVALID_SOCKET) {
+            closesocket(socket);
+        }
+    }
+    connectedClients.clear();
+    if (logCallback) {
+
+        logCallback("Sockets are closed.");
+    }
+    // Clean up Winsock
+    WSACleanup();
 }
 
 void BroadcastBanditSelection(const char* playerID, const char* banditType)
@@ -375,16 +457,14 @@ void BroadcastBanditSelection(const char* playerID, const char* banditType)
         
     }
 }
-
-extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePort)
+/*extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePort)
 {
 
 
     WSADATA wsaData;
-    SOCKET querySocket = INVALID_SOCKET;
+    SOCKET clientSocket = INVALID_SOCKET;
     struct sockaddr_in server;
     char buffer[1024] = { 0 };
-    int serverPort = 0;
 
     // Initialize Winsock
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -393,8 +473,8 @@ extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePor
     }
 
     // Create Socket
-    querySocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (querySocket == INVALID_SOCKET) {
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket == INVALID_SOCKET) {
         logCallback("Socket creation failed");
         WSACleanup();
         return;
@@ -406,40 +486,51 @@ extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePor
     inet_pton(AF_INET, queryServiceIP, &server.sin_addr);
 
     // Connect to the Query Service
-    if (connect(querySocket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
+    if (connect(clientSocket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
         logCallback("Connect failed");
-        closesocket(querySocket);
+        closesocket(clientSocket);
         WSACleanup();
         return;
     }
 
-    // Receive data from the Query Service
-    if (recv(querySocket, buffer, sizeof(buffer), 0) <= 0) {
-        logCallback("Receive failed or connection closed");
-        closesocket(querySocket);
+    // Notify the server that a new client has joined
+    const char* joinMsg = "New Client Joined";
+    if (send(clientSocket, joinMsg, strlen(joinMsg), 0) == SOCKET_ERROR) {
+        logCallback("Failed to notify server of new client");
+        closesocket(clientSocket);
         WSACleanup();
         return;
     }
 
-    // Convert received data to port number
-    serverPort = atoi(buffer);
-    if (serverPort <= 0) {
-        logCallback("Invalid port received");
-        closesocket(querySocket);
-        WSACleanup();
-        return;
+    // Listen for messages from the server
+    while (true) {
+        int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesReceived > 0) {
+            // Process the message received
+            logCallback("Message from server: ");
+            logCallback(buffer);
+        }
+        else if (bytesReceived == 0) {
+            logCallback("Server closed the connection");
+            break;
+        }
+        else {
+            logCallback("Receive failed");
+            break;
+        }
     }
 
-    // Connection to the query service succeeded and received the server port
-    logCallback(("Query service provided server port: " + std::to_string(serverPort)).c_str());
-
-    // Close the query socket as it's no longer needed
-    closesocket(querySocket);
+    // Close the client socket
+    closesocket(clientSocket);
     // Cleanup Winsock
     WSACleanup();
 
 }
 
+extern "C" void CleanupClient() {
+
+    
+}*/
 
 unsigned short QuerryServerPort() {
   
@@ -500,5 +591,4 @@ SOCKET GetClientSocket()
 {
     return g_clientSocket; //Return the global client socket
 }
-
 

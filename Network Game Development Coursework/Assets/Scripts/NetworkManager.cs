@@ -13,7 +13,8 @@ public class NetworkManager : MonoBehaviour
     public bool isClient = true;
 
     // Thread to handle the listening process
-    private Thread listenThread;
+    
+    private Thread clientThread;
     private bool isListening = true; // Control flag for the listening thread
 
     // A thread-safe queue to hold messages received from the server
@@ -26,7 +27,7 @@ public class NetworkManager : MonoBehaviour
 
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void InitializeServer();
+    private static extern void InitializeServer();//This will be called inside an internal function of unity's side
 
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
@@ -34,6 +35,8 @@ public class NetworkManager : MonoBehaviour
 
     [DllImport("NetworkAccess")]
     private static extern void ConnectToServer();
+    [DllImport("NetworkAccess")]
+    private static extern void CleanUpServer();
     [DllImport("NetworkAccess")]
     private static extern void BroadcastBanditSelection(string playerID, string banditType);
 
@@ -82,21 +85,22 @@ public class NetworkManager : MonoBehaviour
     {
         SetLogCallback(LogFromDLL);
         SetMessageReceivedCallback(OnMessageReceived); // Set the message received callback for the communication between client and server
-
-        InitializeServer();
-
+        /* InitializeServer();
         ushort port=QuerryServerPort();
         IntPtr ipPtr=QuerryServerIP();
         string serverIP=Marshal.PtrToStringAnsi(ipPtr);
-        if (port != 0)
+        if (port != 0 && serverIP != null)
         {
-            Debug.Log("Successfully accessed port number " + port+" and ip: "+ serverIP);
+            Debug.Log("Successfully accessed port number " + port + " and ip: " + serverIP);
+           
+
         }
         else
         {
-            Debug.Log("Fail to retrieve port number!");
-        }
-       
+            Debug.LogError("Failed to retrieve server information!");
+        }*/
+
+
     }
 
     // Update is called once per frame
@@ -137,6 +141,12 @@ public class NetworkManager : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        
+        CleanUpServer();
+    }
+
+    public void StartServer()
+    {
+        InitializeServer();
+        SceneManager.LoadScene("SelectionPage");
     }
 }

@@ -13,6 +13,8 @@ extern "C" {
 
     /*Server Code*/
     __declspec(dllexport) void InitializeServer();
+
+    __declspec(dllexport) void CleanUpServer();
    
     __declspec(dllexport) void AcceptClients(SOCKET listenSocket);
     
@@ -23,10 +25,10 @@ extern "C" {
 
 
     /*Client Code*/
-    __declspec(dllexport) void InitializeClient(const char* queryServiceIP, int queryServicePort);
+    //__declspec(dllexport) void InitializeClient(const char* queryServiceIP, int queryServicePort);
     __declspec(dllexport) void ConnectToServer();
 
-    __declspec(dllexport) void CleanupClient();
+    //__declspec(dllexport) void CleanupClient();
 
     __declspec(dllexport) bool ReceiveMessagesFromServer(SOCKET clientSocket);
 

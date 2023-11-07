@@ -7,6 +7,9 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Bandits - Pixel Art/Demo/MainMenu.unity
+    guid: 2713a029422fa9846b236df914f7bf46
+  - enabled: 1
+    path: Assets/Bandits - Pixel Art/Demo/SelectionPage.unity
     guid: 66591c3947d74f24c81e16bd1246acf2
   - enabled: 1
     path: Assets/Scenes/LobbyRoom.unity
