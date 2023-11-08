@@ -5,16 +5,27 @@
 #include <winsock.h>
 #include <vector>
 #include <string>
-
+#include <string>
+#include <unordered_map>
 
 
 extern "C" {
 
 
     /*Server Code*/
-    __declspec(dllexport) void InitializeServer();
+    __declspec(dllexport) void InitializeServer(const char* password, const char* sessionID);
 
     __declspec(dllexport) void CleanUpServer();
+   
+    __declspec(dllexport) void SetSessionIDsPasswords(const char* sessionID,const char* password);
+    __declspec(dllexport) const char* GetSessionID(const char* sessionID);
+    __declspec(dllexport) const char* GetSessionPassword(const char* sessionID);
+
+    __declspec(dllexport) bool ValidateSessionIDAndPassword(const char* sessionId, const char* password);
+
+    __declspec(dllexport) void SendSessionInfo(const char* sessionID, const char* sessionPassword, SOCKET clientSocket);
+    __declspec(dllexport) void BroadcastSessionInfo(const char* sessionID, const char* sessionPassword);
+   
    
     __declspec(dllexport) void AcceptClients(SOCKET listenSocket);
     

@@ -20,14 +20,14 @@ public class NetworkManager : MonoBehaviour
     // A thread-safe queue to hold messages received from the server
     private static ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
 
-
+    public Dictionary<string, string> sessionIDPasswordPairs;
     /*External C++ Functions for Networking*/
     [DllImport("NetworkAccess")]
     private static extern void SetLogCallback(LogCallback callback);// This is the function used for callback of debugging
 
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void InitializeServer();//This will be called inside an internal function of unity's side
+    private static extern void InitializeServer(string sessionID,string password);//This will be called inside an internal function of unity's side
 
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
@@ -56,6 +56,16 @@ public class NetworkManager : MonoBehaviour
     private static extern IntPtr QuerryServerIP(); //Hint: don't define it as a string type as memory management between c# and c++ are different
 
 
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern string GetSessionID(string sessionID);
+
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern string GetSessionPassword(string sessionID);
+
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool ValidateSessionIDAndPassword(string sessionID,string password);
+
+    
 
     // This delegate matches the C++ callback signature
     public delegate void LogCallback(string message);
@@ -79,37 +89,24 @@ public class NetworkManager : MonoBehaviour
 
     public string selectedBanditType = "";
 
+    public InputField createSessionIDInputField,createPasswordInputField;
+    public InputField joinSessionIDInputField,joinPasswordInputField;
+    private void Awake()
+    {
+        sessionIDPasswordPairs = new Dictionary<string, string>();
+    }
 
     // Start is called before the first frame update
     void Start()
     {
         SetLogCallback(LogFromDLL);
         SetMessageReceivedCallback(OnMessageReceived); // Set the message received callback for the communication between client and server
-        /* InitializeServer();
-        ushort port=QuerryServerPort();
-        IntPtr ipPtr=QuerryServerIP();
-        string serverIP=Marshal.PtrToStringAnsi(ipPtr);
-        if (port != 0 && serverIP != null)
-        {
-            Debug.Log("Successfully accessed port number " + port + " and ip: " + serverIP);
-           
-
-        }
-        else
-        {
-            Debug.LogError("Failed to retrieve server information!");
-        }*/
-
+        
 
     }
 
     // Update is called once per frame
-    void Update()
-    {
-
-    }
-
-    
+   
     public void SelectBandit(string banditType)
     {
         selectedBanditType = banditType;
@@ -144,9 +141,74 @@ public class NetworkManager : MonoBehaviour
         CleanUpServer();
     }
 
+    public void GoToRoomCreationPage()
+    {
+       
+        SceneManager.LoadScene("RoomCreationPage");
+        
+    }
+    public void GoToPasswordSettingPage()
+    {
+        SceneManager.LoadScene("PasswordSettingRoom");
+    }
+    public void GoToJoinRoomPage()
+    {
+        SceneManager.LoadScene("JoinRoomPage");
+    }
     public void StartServer()
     {
-        InitializeServer();
+        string sessionID = createSessionIDInputField.text;
+        string password = createPasswordInputField.text;
+        if (!string.IsNullOrEmpty(sessionID) && !string.IsNullOrEmpty(password))
+        {
+            // Store the session ID and password pair
+            sessionIDPasswordPairs[sessionID] = password;
+            // Call the DLL function to initialize the server with sessionID and password
+            InitializeServer(sessionID, password);
+            Debug.Log("Server started with session ID: " + sessionID+" and password: "+ password);
+        }
+        else
+        {
+            Debug.LogError("Session ID and password cannot be empty.");
+        }
         SceneManager.LoadScene("SelectionPage");
+    }
+    public void JoinLobby()
+    {
+        string sessionID = joinSessionIDInputField.text;
+        string password = joinPasswordInputField.text;
+
+        // Check if the sessionID exists and the password matches.
+        if (!string.IsNullOrEmpty(sessionID) && !string.IsNullOrEmpty(password))
+        {
+            if (sessionIDPasswordPairs.TryGetValue(sessionID, out string storedPassword))
+            {
+                // Check if the password entered matches the stored password.
+                if (password == storedPassword)
+                {
+                    // If the session is valid and the password matches, connect to the server.
+                    //ConnectToServer();
+                    Debug.Log("Joined lobby with session ID: " + sessionID);
+                    SceneManager.LoadScene("LobbyRoom");
+                }
+                else
+                {
+                    Debug.LogError("Incorrect password for the session ID.");
+                }
+            }
+            else
+            {
+                Debug.LogError("Session ID does not exist.");
+            }
+        }
+        else
+        {
+            Debug.LogError("Session ID and password cannot be empty.");
+        }
+    }
+    public void EndServer()
+    {
+        CleanUpServer();
+        SceneManager.LoadScene("MainMenu");
     }
 }

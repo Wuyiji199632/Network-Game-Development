@@ -13,21 +13,23 @@
 #include <iomanip>
 #include <ws2tcpip.h>
 #include <atomic>
+#include <string>
+#include <unordered_map>
+#include <cstring>
 
 
-// Global list of connected client sockets
-std::vector<SOCKET> connectedClients;
+std::vector<SOCKET> connectedClients;// Global list of connected client sockets
 std::mutex clientMutex;
 unsigned short serverServicePort=0; // To keep track of the server's service port
 std::string serverIP="";
 SOCKET g_clientSocket = INVALID_SOCKET; //Global definition for the client socket
 
 /*Server sockets*/
-SOCKET listenSocket = INVALID_SOCKET;
+SOCKET serverServiceSocket = INVALID_SOCKET;
 SOCKET queryServiceSocket = INVALID_SOCKET;
  bool serverRunning = false;
-// Helper function to get the first non-loopback IP address of this host.
 
+// Helper function to get the first non-loopback IP address of this host.
 const char* GetLocalIPAddress() {
     struct addrinfo hints, * info, * p;
     int result;
@@ -72,6 +74,110 @@ const char* GetLocalIPAddress() {
 
     return ipAddress;
 }
+#pragma region Session IDs and passwords creation and validation
+
+
+// Custom hash function
+struct CStrHash {
+
+    std::size_t operator()(const char* s) const {
+        std::size_t hash = 0;
+        while (*s) {
+            hash = hash * 101 + *s++;  // A simple hash multiplier can be used
+        }
+        return hash;
+    }
+};
+
+// Custom equality function for pointer euqality inside the unordered map
+struct CStrEqual {
+    bool operator()(const char* s1, const char* s2) const {
+        return std::strcmp(s1, s2) == 0;
+    }
+};
+
+std::unordered_map<const char*, const char*, CStrHash, CStrEqual> sessionIDsPasswords; //1st element is session ID and the second is session Password
+
+struct ClientInfo {
+
+    SOCKET socket;
+    const char* sessionID;
+    const char* password;
+};
+std::map<SOCKET, ClientInfo> clientMap;
+std::mutex clientMapMutex;
+void SetSessionIDsPasswords(const char* sessionID, const char* password)
+{
+    sessionIDsPasswords[sessionID] = password;
+}
+
+extern "C" const char* GetSessionPassword(const char* sessionID)
+{
+    auto it = sessionIDsPasswords.find(sessionID);
+    if (it != sessionIDsPasswords.end()) {
+
+        return it->second;
+    }
+    return nullptr;
+}
+extern "C" const char* GetSessionID(const char* sessionID)
+{
+    auto it = sessionIDsPasswords.find(sessionID);
+    if (it != sessionIDsPasswords.end()) {
+        
+        return it->first;
+    }
+    
+    return nullptr;
+   
+}
+extern "C"
+bool ValidateSessionIDAndPassword(const char* sessionID, const char* password)
+{
+
+    auto it = sessionIDsPasswords.find(sessionID);
+
+    if (it != sessionIDsPasswords.end()) {
+
+        return std::strcmp(it->first, sessionID) == 0&&std::strcmp(it->second,password)==0;
+    }
+
+    return false;
+}
+
+
+
+// Serializes the session info and sends it to the given socket.
+void SendSessionInfo(const char* sessionID, const char* sessionPassword, SOCKET clientSocket) {
+    // Calculate the total size of the message.
+    size_t idLength = strlen(sessionID);
+    size_t passwordLength = strlen(sessionPassword);
+    size_t totalSize = idLength + passwordLength + 2; // +2 for null terminators
+
+    // Allocate a buffer for the message.
+    char* message = new char[totalSize];
+
+    // Copy session ID and password into the buffer, including null terminators.
+    memcpy(message, sessionID, idLength + 1);
+    memcpy(message + idLength + 1, sessionPassword, passwordLength + 1);
+
+    // Send the buffer to the client socket.
+    send(clientSocket, message, totalSize, 0);
+
+    // Clean up the allocated buffer.
+    delete[] message;
+}
+
+// Broadcasts the session info to all connected clients.
+void BroadcastSessionInfo(const char* sessionID, const char* sessionPassword) {
+    std::lock_guard<std::mutex> guard(clientMutex);
+    for (SOCKET clientSocket : connectedClients) {
+        SendSessionInfo(sessionID, sessionPassword, clientSocket);
+    }
+}
+
+#pragma endregion
+
 
 // Function to handle incoming queries
 void HandleQueryService(SOCKET queryServiceSocket) {
@@ -147,7 +253,8 @@ void NotifyClientJoined(const SOCKET& clientSocket)
     }
 
 }
-void AcceptClients(SOCKET listenSocket) {
+
+void AcceptClients(SOCKET listenSocket, const char* sessionID, const char* password) {
 
     while (serverRunning) {
         // Accept incoming client connections
@@ -156,7 +263,7 @@ void AcceptClients(SOCKET listenSocket) {
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             if (error == WSAEWOULDBLOCK) {
-                // No pending connections, just continue and try again.
+                // connections are not pending, just continue and try again.
                 // Introduce some delay to prevent spinning too fast and consuming CPU.
                 std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100 ms delay
                 continue;
@@ -167,19 +274,23 @@ void AcceptClients(SOCKET listenSocket) {
                     logCallback("Accepting client failed.");
                     logCallback(("Accept failed with error: " + std::to_string(error)).c_str());
                 }
-                // Depending on the design, you might want to break out of the loop and terminate the server
-                // or just continue after logging the error.
+               
                 continue;
             }
         }
 
-        // At this point, clientSocket is valid
-        std::string clientID = GenerateUniqueID();
-
         // Lock the mutex, add the client to the connected client list, then unlock.
-        std::lock_guard<std::mutex> guard(clientMutex);
+        std::lock_guard<std::mutex> guard1(clientMutex);
         connectedClients.push_back(clientSocket);
         // Client is now successfully added, log or process as needed.
+
+        ClientInfo info;
+        info.socket = clientSocket;
+        info.sessionID = sessionID;
+        info.password = password;
+
+        std::lock_guard<std::mutex> guard2(clientMapMutex);
+        clientMap[clientSocket] = info;
        
     }
 }
@@ -214,7 +325,7 @@ int BindSocketWithRetry(SOCKET& socket, struct sockaddr_in& serviceAddr, int ret
     return -1;
 }
 
-extern "C" void InitializeServer()
+extern "C" void InitializeServer(const char* sessionID, const char* password)
 {
     WSADATA wsaData;
     serverRunning = true;
@@ -226,10 +337,10 @@ extern "C" void InitializeServer()
         }
         return;
     }
-
+    SetSessionIDsPasswords(sessionID, password);
     // 2. Create a Socket
-    listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (listenSocket == INVALID_SOCKET) {
+    serverServiceSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (serverServiceSocket == INVALID_SOCKET) {
         if (logCallback != nullptr) {
             logCallback("Socket creation failed.");
         }
@@ -237,14 +348,14 @@ extern "C" void InitializeServer()
         return;
     }
 
-    // Set non-blocking mode for the listening socket
+    // Set non-blocking mode for the service socket
     unsigned long mode = 1;
-    result = ioctlsocket(listenSocket, FIONBIO, &mode);
+    result = ioctlsocket(serverServiceSocket, FIONBIO, &mode);
     if (result != NO_ERROR) {
         if (logCallback != nullptr) {
             logCallback("Failed to set listenSocket to non-blocking mode.");
         }
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         WSACleanup();
         return;
     }
@@ -255,7 +366,7 @@ extern "C" void InitializeServer()
     queryServiceSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (queryServiceSocket == INVALID_SOCKET) {
         logCallback("Query service socket creation failed.");
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         WSACleanup();
         return;
     }
@@ -266,7 +377,7 @@ extern "C" void InitializeServer()
         if (logCallback) {
             logCallback("Failed to set queryServiceSocket to non-blocking mode.");
         }
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         closesocket(queryServiceSocket);
         WSACleanup();
         return;
@@ -312,13 +423,12 @@ extern "C" void InitializeServer()
             logCallback("Listen for query service failed.");
         }
        
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         closesocket(queryServiceSocket);
         WSACleanup();
         return;
     }
-
-    // 6.Start a thread for the query service to handle incoming queries
+    /*// 6.Start a thread for the query service to handle incoming queries
     std::thread queryServiceThread(HandleQueryService, queryServiceSocket);
     if (queryServiceThread.joinable()) {
 
@@ -332,9 +442,10 @@ extern "C" void InitializeServer()
             // Cleanup code
         }
        
-    }
+    }*/
+    
 
-    // 7.Bind the Socket to an IP Address and Port 
+    // 6.Bind the Socket to an IP Address and Port 
     struct sockaddr_in serverService;
     serverService.sin_family = AF_INET;
     serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
@@ -347,13 +458,13 @@ extern "C" void InitializeServer()
     int randomPort = distrib(gen);
     serverService.sin_port = htons(8888); //Bind the generated port number to the server socket
 
-    //8.Bind to the server service socket
-    if (bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
+    //7.Bind to the server service socket
+    if (bind(serverServiceSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
 
         if (logCallback != nullptr) {
             logCallback("Bind failed.");
         }
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         WSACleanup();
         return;
     }
@@ -361,7 +472,7 @@ extern "C" void InitializeServer()
         // After binding, get the port number
         struct sockaddr_in sin;
         int addrlen = sizeof(sin);
-        if (getsockname(listenSocket, (struct sockaddr*)&sin, &addrlen) == 0 && sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
+        if (getsockname(serverServiceSocket, (struct sockaddr*)&sin, &addrlen) == 0 && sin.sin_family == AF_INET && addrlen == sizeof(sin)) {
 
             serverServicePort = ntohs(sin.sin_port);
             serverIP = GetLocalIPAddress();
@@ -374,29 +485,33 @@ extern "C" void InitializeServer()
             if (logCallback != nullptr) {
                 logCallback("Failed to get socket name.");
             }
-            closesocket(listenSocket);
+            closesocket(serverServiceSocket);
             WSACleanup();
             return;
         }
     }
-    //9.Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+    //8.Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
+    if (listen(serverServiceSocket, SOMAXCONN) == SOCKET_ERROR) {
         if (logCallback != nullptr) {
             logCallback(("Listen failed with error: " + std::to_string(WSAGetLastError())).c_str());
         }
-        closesocket(listenSocket);
+        closesocket(serverServiceSocket);
         WSACleanup();
         return;
     }
 
    
-    //10. Start a new thread to accept clients so that the process does not block that for binding port and listening for clients
+    //9. Start a new thread to accept clients so that the process does not block that for binding port and listening for clients
    
-    std::thread acceptThread(AcceptClients, listenSocket);
+    std::thread acceptThread([=]() { AcceptClients(serverServiceSocket, sessionID, password); });
+
     if (acceptThread.joinable()) {
         acceptThread.detach();  // Let it run independently
     }
+
+    
     else {
+
         if(logCallback){
 
             logCallback("Could not create accept thread.");
@@ -409,6 +524,25 @@ extern "C" void InitializeServer()
 		logCallback("Server and query service are running.");
 		
 	}	
+    // 10.Start the broadcast session info in a separate thread
+    std::thread broadcastThread(BroadcastSessionInfo, sessionID, password);
+    if (broadcastThread.joinable()) {
+
+        broadcastThread.detach(); // Let the broadcast session info thread run independently
+    }
+    else {
+
+        if (logCallback) {
+            logCallback("Could not create broadcast session info thread.");
+        }
+    }
+
+    
+
+    if (logCallback != nullptr) {
+        logCallback("Server initialization is complete.");
+    }
+
 }
 
 extern "C" void CleanUpServer()
@@ -421,9 +555,9 @@ extern "C" void CleanUpServer()
     }
 
     // Close the listen socket if it's valid
-    if (listenSocket != INVALID_SOCKET) {
-        closesocket(listenSocket);
-        listenSocket = INVALID_SOCKET;
+    if (serverServiceSocket != INVALID_SOCKET) {
+        closesocket(serverServiceSocket);
+        serverServiceSocket = INVALID_SOCKET;
     }
 
     // Perform cleanup on all client sockets
@@ -441,6 +575,8 @@ extern "C" void CleanUpServer()
     WSACleanup();
 }
 
+
+
 void BroadcastBanditSelection(const char* playerID, const char* banditType)
 {
     // Create a message to send to clients
@@ -457,80 +593,6 @@ void BroadcastBanditSelection(const char* playerID, const char* banditType)
         
     }
 }
-/*extern "C" void InitializeClient(const char* queryServiceIP, int queryServicePort)
-{
-
-
-    WSADATA wsaData;
-    SOCKET clientSocket = INVALID_SOCKET;
-    struct sockaddr_in server;
-    char buffer[1024] = { 0 };
-
-    // Initialize Winsock
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        logCallback("WSAStartup failed");
-        return;
-    }
-
-    // Create Socket
-    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (clientSocket == INVALID_SOCKET) {
-        logCallback("Socket creation failed");
-        WSACleanup();
-        return;
-    }
-
-    // Setup server structure
-    server.sin_family = AF_INET;
-    server.sin_port = htons(queryServicePort);
-    inet_pton(AF_INET, queryServiceIP, &server.sin_addr);
-
-    // Connect to the Query Service
-    if (connect(clientSocket, (struct sockaddr*)&server, sizeof(server)) == SOCKET_ERROR) {
-        logCallback("Connect failed");
-        closesocket(clientSocket);
-        WSACleanup();
-        return;
-    }
-
-    // Notify the server that a new client has joined
-    const char* joinMsg = "New Client Joined";
-    if (send(clientSocket, joinMsg, strlen(joinMsg), 0) == SOCKET_ERROR) {
-        logCallback("Failed to notify server of new client");
-        closesocket(clientSocket);
-        WSACleanup();
-        return;
-    }
-
-    // Listen for messages from the server
-    while (true) {
-        int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
-        if (bytesReceived > 0) {
-            // Process the message received
-            logCallback("Message from server: ");
-            logCallback(buffer);
-        }
-        else if (bytesReceived == 0) {
-            logCallback("Server closed the connection");
-            break;
-        }
-        else {
-            logCallback("Receive failed");
-            break;
-        }
-    }
-
-    // Close the client socket
-    closesocket(clientSocket);
-    // Cleanup Winsock
-    WSACleanup();
-
-}
-
-extern "C" void CleanupClient() {
-
-    
-}*/
 
 unsigned short QuerryServerPort() {
   
@@ -592,3 +654,11 @@ SOCKET GetClientSocket()
     return g_clientSocket; //Return the global client socket
 }
 
+extern "C"
+void ConnectToServer() {
+
+    if (logCallback) {
+
+        logCallback("Connected To The Server!");
+    }
+}
