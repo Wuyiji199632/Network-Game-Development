@@ -7,16 +7,63 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Threading;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
+using System.IO;
+
+
+//Encryption class used to encrypt the session credentials
+public static class CryptoUtility
+{
+
+    public static byte[] GenerateRandomBytes(int length)
+    {
+        using (RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider())
+        {
+            byte[] randomBytes = new byte[length];
+            rng.GetBytes(randomBytes);
+            return randomBytes;
+        }
+    }
+
+
+    public static readonly byte[] EncryptionKey = Encoding.UTF8.GetBytes("32-character-long-key-string-123");
+    public static readonly byte[] InitializationVector = Encoding.UTF8.GetBytes("abcdefghijklmnop"); 
+
+    public static string EncryptString(string plainText)
+    {
+        using (Aes aesAlg = Aes.Create())
+        {
+            aesAlg.Key = EncryptionKey;
+            aesAlg.IV = InitializationVector;
+
+            ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
+
+            using (MemoryStream msEncrypt = new MemoryStream())
+            {
+                using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+                {
+                    using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
+                    {
+                        swEncrypt.Write(plainText);
+                    }
+                    return Convert.ToBase64String(msEncrypt.ToArray());
+                }
+            }
+        }
+    }
+}
+
 
 public class NetworkManager : MonoBehaviour
 {
     public bool isClient = true;
-
+    private int localClientID = 0;
     // Thread to handle the listening process
     
     private Thread clientThread;
     private bool isListening = true; // Control flag for the listening thread
-
+    
     // A thread-safe queue to hold messages received from the server
     private static ConcurrentQueue<string> messageQueue = new ConcurrentQueue<string>();
 
@@ -28,15 +75,11 @@ public class NetworkManager : MonoBehaviour
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
     private static extern void InitializeServer(string sessionID,string password);//This will be called inside an internal function of unity's side
-
-
-    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void InitializeClient(string queryServiceIP, int queryServicePort);
-
-    [DllImport("NetworkAccess")]
-    private static extern void ConnectToServer();
+   
     [DllImport("NetworkAccess")]
     private static extern void CleanUpServer();
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern bool StoreSessionCredentials(string sessionID, string password);
     [DllImport("NetworkAccess")]
     private static extern void BroadcastBanditSelection(string playerID, string banditType);
 
@@ -55,12 +98,6 @@ public class NetworkManager : MonoBehaviour
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr QuerryServerIP(); //Hint: don't define it as a string type as memory management between c# and c++ are different
 
-
-    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern string GetSessionID(string sessionID);
-
-    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern string GetSessionPassword(string sessionID);
 
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
     private static extern bool ValidateSessionIDAndPassword(string sessionID,string password);
@@ -93,9 +130,10 @@ public class NetworkManager : MonoBehaviour
     public InputField joinSessionIDInputField,joinPasswordInputField;
     private void Awake()
     {
+        
         sessionIDPasswordPairs = new Dictionary<string, string>();
     }
-
+    
     // Start is called before the first frame update
     void Start()
     {
@@ -161,11 +199,23 @@ public class NetworkManager : MonoBehaviour
         string password = createPasswordInputField.text;
         if (!string.IsNullOrEmpty(sessionID) && !string.IsNullOrEmpty(password))
         {
-            // Store the session ID and password pair
-            sessionIDPasswordPairs[sessionID] = password;
-            // Call the DLL function to initialize the server with sessionID and password
-            InitializeServer(sessionID, password);
-            Debug.Log("Server started with session ID: " + sessionID+" and password: "+ password);
+
+            string encryptedSessionID = CryptoUtility.EncryptString(sessionID);
+            string encryptedPassword = CryptoUtility.EncryptString(password);
+
+            InitializeServer(encryptedSessionID, encryptedPassword);
+
+            bool result = StoreSessionCredentials(encryptedSessionID, encryptedPassword);
+            if (result)
+            {
+                Debug.Log("Server started with encrypted session ID and password");
+            }
+            else
+            {
+                Debug.Log("Fail to store encrypted session credentials!");
+            }
+
+
         }
         else
         {
@@ -210,5 +260,10 @@ public class NetworkManager : MonoBehaviour
     {
         CleanUpServer();
         SceneManager.LoadScene("MainMenu");
+    }
+
+    public void InitializeClient()
+    {
+
     }
 }

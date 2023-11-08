@@ -16,14 +16,20 @@
 #include <string>
 #include <unordered_map>
 #include <cstring>
-
+#include <fstream>
+#include <chrono>
+#include <atomic>
+#include <windows.h>
+#include <Wincrypt.h>
+#include <bcrypt.h>
+#include <string.h>
+#include <iostream>
 
 std::vector<SOCKET> connectedClients;// Global list of connected client sockets
 std::mutex clientMutex;
 unsigned short serverServicePort=0; // To keep track of the server's service port
 std::string serverIP="";
 SOCKET g_clientSocket = INVALID_SOCKET; //Global definition for the client socket
-
 /*Server sockets*/
 SOCKET serverServiceSocket = INVALID_SOCKET;
 SOCKET queryServiceSocket = INVALID_SOCKET;
@@ -91,6 +97,7 @@ struct CStrHash {
 
 // Custom equality function for pointer euqality inside the unordered map
 struct CStrEqual {
+
     bool operator()(const char* s1, const char* s2) const {
         return std::strcmp(s1, s2) == 0;
     }
@@ -98,39 +105,21 @@ struct CStrEqual {
 
 std::unordered_map<const char*, const char*, CStrHash, CStrEqual> sessionIDsPasswords; //1st element is session ID and the second is session Password
 
-struct ClientInfo {
+std::mutex sessionMapMutex;
 
-    SOCKET socket;
-    const char* sessionID;
-    const char* password;
-};
-std::map<SOCKET, ClientInfo> clientMap;
-std::mutex clientMapMutex;
-void SetSessionIDsPasswords(const char* sessionID, const char* password)
+extern "C"
+bool StoreSessionCredentials(const char* sessionID, const char* password)
 {
-    sessionIDsPasswords[sessionID] = password;
-}
-
-extern "C" const char* GetSessionPassword(const char* sessionID)
-{
-    auto it = sessionIDsPasswords.find(sessionID);
-    if (it != sessionIDsPasswords.end()) {
-
-        return it->second;
-    }
-    return nullptr;
-}
-extern "C" const char* GetSessionID(const char* sessionID)
-{
-    auto it = sessionIDsPasswords.find(sessionID);
-    if (it != sessionIDsPasswords.end()) {
-        
-        return it->first;
-    }
-    
-    return nullptr;
    
+    
+    // Store the decrypted session ID and password
+    sessionIDsPasswords[sessionID] = password;
+
+    return true;
 }
+
+
+
 extern "C"
 bool ValidateSessionIDAndPassword(const char* sessionID, const char* password)
 {
@@ -148,7 +137,7 @@ bool ValidateSessionIDAndPassword(const char* sessionID, const char* password)
 
 
 // Serializes the session info and sends it to the given socket.
-void SendSessionInfo(const char* sessionID, const char* sessionPassword, SOCKET clientSocket) {
+void SendSessionInfo(const char* sessionID, const char* sessionPassword,SOCKET clientSocket) {
     // Calculate the total size of the message.
     size_t idLength = strlen(sessionID);
     size_t passwordLength = strlen(sessionPassword);
@@ -256,10 +245,11 @@ void NotifyClientJoined(const SOCKET& clientSocket)
 
 void AcceptClients(SOCKET listenSocket, const char* sessionID, const char* password) {
 
+    
     while (serverRunning) {
         // Accept incoming client connections
         SOCKET clientSocket = accept(listenSocket, NULL, NULL);
-
+       
         if (clientSocket == INVALID_SOCKET) {
             int error = WSAGetLastError();
             if (error == WSAEWOULDBLOCK) {
@@ -277,20 +267,20 @@ void AcceptClients(SOCKET listenSocket, const char* sessionID, const char* passw
                
                 continue;
             }
+                     
         }
-
+        // Set the client socket to non-blocking mode
+        unsigned long mode = 1;
+        if (ioctlsocket(clientSocket, FIONBIO, &mode) != NO_ERROR) {
+            if (logCallback != nullptr) {
+                logCallback("Failed to set clientSocket to non-blocking mode.");
+            }
+            closesocket(clientSocket);
+            continue;
+        }           
         // Lock the mutex, add the client to the connected client list, then unlock.
         std::lock_guard<std::mutex> guard1(clientMutex);
         connectedClients.push_back(clientSocket);
-        // Client is now successfully added, log or process as needed.
-
-        ClientInfo info;
-        info.socket = clientSocket;
-        info.sessionID = sessionID;
-        info.password = password;
-
-        std::lock_guard<std::mutex> guard2(clientMapMutex);
-        clientMap[clientSocket] = info;
        
     }
 }
@@ -337,7 +327,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
         }
         return;
     }
-    SetSessionIDsPasswords(sessionID, password);
+    
     // 2. Create a Socket
     serverServiceSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverServiceSocket == INVALID_SOCKET) {
@@ -428,7 +418,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
         WSACleanup();
         return;
     }
-    /*// 6.Start a thread for the query service to handle incoming queries
+    // 6.Start a thread for the query service to handle incoming queries
     std::thread queryServiceThread(HandleQueryService, queryServiceSocket);
     if (queryServiceThread.joinable()) {
 
@@ -442,10 +432,9 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
             // Cleanup code
         }
        
-    }*/
+    }
     
-
-    // 6.Bind the Socket to an IP Address and Port 
+    // 7.Bind the Socket to an IP Address and Port 
     struct sockaddr_in serverService;
     serverService.sin_family = AF_INET;
     serverService.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
@@ -458,7 +447,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
     int randomPort = distrib(gen);
     serverService.sin_port = htons(8888); //Bind the generated port number to the server socket
 
-    //7.Bind to the server service socket
+    //8.Bind to the server service socket
     if (bind(serverServiceSocket, (SOCKADDR*)&serverService, sizeof(serverService)) == SOCKET_ERROR) {
 
         if (logCallback != nullptr) {
@@ -490,7 +479,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
             return;
         }
     }
-    //8.Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
+    //9.Check if listening is failed for the listen socket, if is succeeds, skip this if statement and accept new clients
     if (listen(serverServiceSocket, SOMAXCONN) == SOCKET_ERROR) {
         if (logCallback != nullptr) {
             logCallback(("Listen failed with error: " + std::to_string(WSAGetLastError())).c_str());
@@ -501,7 +490,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
     }
 
    
-    //9. Start a new thread to accept clients so that the process does not block that for binding port and listening for clients
+    //10. Start a new thread to accept clients so that the process does not block that for binding port and listening for clients
    
     std::thread acceptThread([=]() { AcceptClients(serverServiceSocket, sessionID, password); });
 
@@ -524,7 +513,7 @@ extern "C" void InitializeServer(const char* sessionID, const char* password)
 		logCallback("Server and query service are running.");
 		
 	}	
-    // 10.Start the broadcast session info in a separate thread
+    // 11.Start the broadcast session info in a separate thread
     std::thread broadcastThread(BroadcastSessionInfo, sessionID, password);
     if (broadcastThread.joinable()) {
 
@@ -649,11 +638,25 @@ bool ReceiveMessagesFromServer(SOCKET clientSocket)
     return false;
 }
 
+bool SendSessionCredentials(const char* sessionID, const char* password)
+{
+    return false;
+}
+
 SOCKET GetClientSocket()
 {
     return g_clientSocket; //Return the global client socket
 }
 
+extern "C"
+void InitializeClient(const char* queryServiceIP, unsigned short queryServicePort)
+{
+    if (logCallback) {
+
+        logCallback("Client joined!");
+    }
+
+}
 extern "C"
 void ConnectToServer() {
 

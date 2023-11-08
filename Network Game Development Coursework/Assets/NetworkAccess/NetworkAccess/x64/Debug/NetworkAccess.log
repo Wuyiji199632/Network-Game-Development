@@ -1,13 +1,19 @@
 ﻿  ProtocolService.cpp
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(47,25): warning C4477: 'fprintf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'WCHAR *'
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(47,25): message : consider using '%ls' in the format string
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(47,25): message : consider using '%lls' in the format string
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(47,25): message : consider using '%Ls' in the format string
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(47,25): message : consider using '%ws' in the format string
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(165,33): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(205,80): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(245,57): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(587,59): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(53,25): warning C4477: 'fprintf' : format string '%s' requires an argument of type 'char *', but variadic argument 1 has type 'WCHAR *'
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(53,25): message : consider using '%ls' in the format string
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(53,25): message : consider using '%lls' in the format string
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(53,25): message : consider using '%Ls' in the format string
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(53,25): message : consider using '%ws' in the format string
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(154,33): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(194,80): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(234,57): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\ProtocolService.cpp(576,59): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+  QuerryServer.cpp
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\QuerryServer.cpp(29,61): warning C4267: 'argument': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\QuerryServer.cpp(46,49): warning C4101: 'e': unreferenced local variable
+C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\NetworkAccess\QuerryServer.cpp(51,45): warning C4101: 'e': unreferenced local variable
+  dllmain.cpp
+  Generating Code...
   LINK : C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\x64\Debug\NetworkAccess.dll not found or not built by the last incremental link; performing full link
      Creating library C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\x64\Debug\NetworkAccess.lib and object C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\x64\Debug\NetworkAccess.exp
   NetworkAccess.vcxproj -> C:\Users\wuyij\Documents\GitHub\Network-Game-Development\Network Game Development Coursework\Assets\NetworkAccess\x64\Debug\NetworkAccess.dll
