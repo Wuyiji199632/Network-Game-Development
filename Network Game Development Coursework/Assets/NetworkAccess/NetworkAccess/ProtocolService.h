@@ -24,7 +24,7 @@ extern "C" {
 
     __declspec(dllexport) void SendSessionInfo(const char* sessionID, const char* sessionPassword, SOCKET clientSocket);
     __declspec(dllexport) void BroadcastSessionInfo(const char* sessionID, const char* sessionPassword);
-
+    __declspec(dllexport) void SendClientMessage(const char* message);
    
    
     __declspec(dllexport) void AcceptClients(SOCKET listenSocket);

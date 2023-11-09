@@ -39,7 +39,7 @@ SOCKET queryServiceSocket = INVALID_SOCKET;
 const char* GetLocalIPAddress() {
     struct addrinfo hints, * info, * p;
     int result;
-
+   
     char hostname[1024];
     char ipstr[INET6_ADDRSTRLEN];
     hostname[1023] = '\0';
@@ -165,6 +165,14 @@ void BroadcastSessionInfo(const char* sessionID, const char* sessionPassword) {
     }
 }
 
+void SendClientMessage(const char* message)
+{
+    if (logCallback) {
+
+        logCallback(message);
+    }
+}
+
 #pragma endregion
 
 
@@ -204,43 +212,6 @@ void HandleQueryService(SOCKET queryServiceSocket) {
         }
         closesocket(querySocket);
     }
-}
-
-
-std::string GenerateUniqueID() {
-
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dis;
-
-    std::stringstream ss;
-    for (int i = 0; i < 2; i++) {
-        ss << std::hex << dis(gen);
-    }
-
-    return ss.str();
-
-}
-void NotifyClientJoined(const SOCKET& clientSocket)
-{
-    std::string message = "A new player joined the lobby!";
-
-    //Iterate through all the joined clients and send the message to them.
-
-    for (SOCKET socket : connectedClients) {
-
-        if (socket != clientSocket) {
-
-            send(socket, message.c_str(), message.length(), 0);
-        }
-    }
-
-    // Optionally, log this on the server-side
-    if (logCallback != nullptr) {
-
-        logCallback(("Notified all clients that a new player has joined: " + message).c_str());
-    }
-
 }
 
 void AcceptClients(SOCKET listenSocket, const char* sessionID, const char* password) {
@@ -590,7 +561,7 @@ unsigned short QuerryServerPort() {
 }
 const char* QuerryServerIP()
 {
-    return GetLocalIPAddress();
+    return serverIP.c_str();
 }
 bool ReceiveMessagesFromServer(SOCKET clientSocket)
 {

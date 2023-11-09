@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -10,50 +12,6 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.IO;
-
-
-//Encryption class used to encrypt the session credentials
-public static class CryptoUtility
-{
-
-    public static byte[] GenerateRandomBytes(int length)
-    {
-        using (RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider())
-        {
-            byte[] randomBytes = new byte[length];
-            rng.GetBytes(randomBytes);
-            return randomBytes;
-        }
-    }
-
-
-    public static readonly byte[] EncryptionKey = Encoding.UTF8.GetBytes("32-character-long-key-string-123");
-    public static readonly byte[] InitializationVector = Encoding.UTF8.GetBytes("abcdefghijklmnop"); 
-
-    public static string EncryptString(string plainText)
-    {
-        using (Aes aesAlg = Aes.Create())
-        {
-            aesAlg.Key = EncryptionKey;
-            aesAlg.IV = InitializationVector;
-
-            ICryptoTransform encryptor = aesAlg.CreateEncryptor(aesAlg.Key, aesAlg.IV);
-
-            using (MemoryStream msEncrypt = new MemoryStream())
-            {
-                using (CryptoStream csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
-                {
-                    using (StreamWriter swEncrypt = new StreamWriter(csEncrypt))
-                    {
-                        swEncrypt.Write(plainText);
-                    }
-                    return Convert.ToBase64String(msEncrypt.ToArray());
-                }
-            }
-        }
-    }
-}
-
 
 public class NetworkManager : MonoBehaviour
 {
@@ -128,20 +86,7 @@ public class NetworkManager : MonoBehaviour
 
     public InputField createSessionIDInputField,createPasswordInputField;
     public InputField joinSessionIDInputField,joinPasswordInputField;
-    private void Awake()
-    {
-        
-        sessionIDPasswordPairs = new Dictionary<string, string>();
-    }
     
-    // Start is called before the first frame update
-    void Start()
-    {
-        SetLogCallback(LogFromDLL);
-        SetMessageReceivedCallback(OnMessageReceived); // Set the message received callback for the communication between client and server
-        
-
-    }
 
     // Update is called once per frame
    
@@ -199,13 +144,10 @@ public class NetworkManager : MonoBehaviour
         string password = createPasswordInputField.text;
         if (!string.IsNullOrEmpty(sessionID) && !string.IsNullOrEmpty(password))
         {
+        
+            InitializeServer(sessionID, password);
 
-            string encryptedSessionID = CryptoUtility.EncryptString(sessionID);
-            string encryptedPassword = CryptoUtility.EncryptString(password);
-
-            InitializeServer(encryptedSessionID, encryptedPassword);
-
-            bool result = StoreSessionCredentials(encryptedSessionID, encryptedPassword);
+            bool result = StoreSessionCredentials(sessionID, password);
             if (result)
             {
                 Debug.Log("Server started with encrypted session ID and password");

@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System;
+using System.Net;
+using System.Net.Sockets;
+
 public class ClientManager : MonoBehaviour
 {
-
+    
     private Thread clientThread;
     private bool isListening = true;
     [DllImport("NetworkAccess")]
@@ -15,10 +19,12 @@ public class ClientManager : MonoBehaviour
     private static extern void ConnectToServer();
     [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
     private static extern ushort QuerryServerPort();
-    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
-    private static extern string QuerryServerIP();
-
     
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr QuerryServerIP(); //Convert it into IntPtr and don't forget to use Marshal to make it into a string
+
+    [DllImport("NetworkAccess", CallingConvention = CallingConvention.Cdecl)]
+    private static extern void SendClientMessage(string message);
 
     public delegate void LogCallback(string message);
 
@@ -55,7 +61,26 @@ public class ClientManager : MonoBehaviour
     }
     void ClientListen()
     {
-        Debug.Log("Client is listening!");
-        
+
+        IntPtr ipPtr = QuerryServerIP();  // Get the pointer to the IP string
+        string ip = Marshal.PtrToStringAnsi(ipPtr);  // Convert pointer to string
+        ushort port = QuerryServerPort();
+
+        Debug.Log("Client is listening! "+"IP: "+ip+"Port: "+ port);
+
+        SendClientMessage("Client Joined!");
+
+    }
+
+    private void OnServerMessageReceived(string message)
+    {
+        Debug.Log("Message received from server: " + message);
+
+        if(message== "Client 1 Joined!")
+        {
+            Debug.Log("A client has joined!");
+        }
+
+
     }
 }
