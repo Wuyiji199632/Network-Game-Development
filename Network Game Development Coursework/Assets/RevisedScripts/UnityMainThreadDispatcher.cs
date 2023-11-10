@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class UnityMainThreadDispatcher : MonoBehaviour
+public class UnityMainThreadDispatcher : MonoBehaviour //This class will ensure that certain functions run on the main thread for specific purposes
 {
     private static readonly Queue<Action> ExecutionQueue = new Queue<Action>();
 

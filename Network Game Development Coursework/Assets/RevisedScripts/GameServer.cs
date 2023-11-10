@@ -26,14 +26,14 @@ public class GameServer : MonoBehaviour
     }
     void Start()
     {
-        StartServer();
+        //StartServer();
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
         joinRoomBtn.gameObject.SetActive(false);
     }
 
-    private void StartServer()
+    public void StartServer()
     {
         serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); //Ensure that each socket address can be reused
@@ -58,17 +58,48 @@ public class GameServer : MonoBehaviour
             return;
         }
 
+        // First, broadcast the message to all connected clients before adding the new client to the list
+        string connectMessage = "New player joined the game from IP: " + socket.RemoteEndPoint.ToString();
+        BroadcastMessage(connectMessage);
+
+        // Now add the new client socket to the list
         clientSockets.Add(socket);
-        socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
-        Debug.Log("Client connected, waiting for request...");
 
-        // Broadcast to all clients that a new client has joined
-        BroadcastMessage("New player joined the game from IP: " + socket.RemoteEndPoint.ToString());
-
-        // Send a welcome message to the connected client
+        // Send the welcome message to the connected client
         SendMessage(socket, "Welcome to the Game Server");
 
+        // Begin receiving data from the new client
+        socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
+
+        // Log the connection
+        Debug.Log(connectMessage);
+
+        // Continue listening for new clients
         serverSocket.BeginAccept(AcceptCallback, null);
+    }
+    private void ProcessReceivedData(Socket current, int received)
+    {
+        byte[] recBuf = new byte[received];
+        Array.Copy(buffer, recBuf, received);
+        string text = Encoding.ASCII.GetString(recBuf);
+        Debug.Log("Received Text: " + text);
+
+        // Echo the text back to the client or process further based on your needs.
+        SendMessage(current, text);
+
+        // Continue to listen for messages from this client.
+        current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
+    }
+
+    private void HandleClientDisconnection(Socket current)
+    {
+        Debug.Log("Client disconnected: " + current.RemoteEndPoint);
+        string disconnectMessage = "CLIENT DISCONNECTED:" + current.RemoteEndPoint.ToString();
+        BroadcastMessage(disconnectMessage);
+
+        // Remove the socket from the list of client sockets.
+        clientSockets.Remove(current);
+        current.Close();
     }
 
     private void ReceiveCallback(IAsyncResult AR)
@@ -79,25 +110,25 @@ public class GameServer : MonoBehaviour
         try
         {
             received = current.EndReceive(AR);
+            if (received == 0) // Client has disconnected gracefully
+            {
+                HandleClientDisconnection(current);
+                
+                return;
+            }
+
+            // Process the received data and prepare for the next message.
+            ProcessReceivedData(current, received);
+
+            
         }
-        catch (SocketException)
+        catch (SocketException ex)
         {
-            Debug.Log("Client forcefully disconnected");
-            // Don't shutdown because the socket may be disposed and its disconnected anyway.
+            Debug.Log("Client forcefully disconnected at " + current.RemoteEndPoint + ": " + ex.Message);
             current.Close();
             clientSockets.Remove(current);
-            return;
+            BroadcastMessage("Player forcibly left the game from IP: " + current.RemoteEndPoint);
         }
-
-        byte[] recBuf = new byte[received];
-        Array.Copy(buffer, recBuf, received);
-        string text = Encoding.ASCII.GetString(recBuf);
-        Debug.Log("Received Text: " + text);
-
-        // Echo the text back to the client
-        current.Send(Encoding.ASCII.GetBytes(text));
-
-        current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
     }
 
     private new void BroadcastMessage(string message)

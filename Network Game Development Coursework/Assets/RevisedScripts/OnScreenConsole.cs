@@ -27,7 +27,15 @@ public class OnScreenConsole : MonoBehaviour
     {
         if (instance != null && instance.consoleText != null)
         {
+            
             instance.consoleText.text += message + "\n";
         }
+        else
+        {
+            // If the instance isn't found, log an error or handle the case as needed
+            Debug.LogError("OnScreenConsole instance or consoleText not found.");
+        }
     }
+
+    
 }
