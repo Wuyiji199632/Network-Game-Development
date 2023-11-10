@@ -12,19 +12,20 @@ using System.Security.Cryptography;
 public class GameServer : MonoBehaviour
 {
     private Socket serverSocket;
-    public bool isRunning;
+    public bool isRunning,joinRoomDecision;
     private List<Socket> clientSockets = new List<Socket>();
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
     [SerializeField]
     private int port = 7777;
-    [SerializeField]
-    private Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
+    
+    public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
     public Dictionary<string, string> activeSessions=new Dictionary<string, string>();//Dictionary to store the active game sessions
 
-    [SerializeField]
-    private InputField createSessionIDField, createSessionPasswordField;
+   
+    
+    public InputField createSessionIDField, createSessionPasswordField;
     private void Awake()
     {
         DontDestroyOnLoad(this);
@@ -134,9 +135,9 @@ public class GameServer : MonoBehaviour
             }
 
             // Process the received data and prepare for the next message.
-            ProcessReceivedData(current, received);
-
             
+            ProcessRequestData(current, received);
+
         }
         catch (SocketException ex)
         {
@@ -174,12 +175,13 @@ public class GameServer : MonoBehaviour
         Socket socket = (Socket)AR.AsyncState;
         try
         {
-            socket.EndSend(AR);
+            int bytesSent=socket.EndSend(AR);
+            Debug.Log($"Sent {bytesSent} bytes to client {socket.RemoteEndPoint}");
         }
         catch (SocketException e)
         {
             Debug.Log("Failed to send message to client: " + e.Message);
-            // Optionally, you might want to remove the client from the list if sending fails
+           
             clientSockets.Remove(socket);
         }
     }
@@ -191,21 +193,103 @@ public class GameServer : MonoBehaviour
         string sessionID = createSessionIDField.text;
         string sessionPassword = createSessionPasswordField.text;
 
-        BroadcastRoomCreation(sessionID, sessionPassword);
-        activeSessions.Add(sessionID, sessionPassword);
-    }
-   
-    private void BroadcastRoomCreation(string sessionId, string sessionPassword)
-    {
-        string roomCreationMsg=$"Create session:{sessionId}:{sessionPassword}";
-        EncodeRoomCreationMessage(roomCreationMsg);
+        if (!activeSessions.ContainsKey(sessionID))
+        {
+            activeSessions.Add(sessionID, sessionPassword);
+            Debug.Log($"Session created with ID: {sessionID} and Password: {sessionPassword}");
+        }
+        else
+        {
+            Debug.LogError("Session ID already exists.");
+        }
+
     }
 
-    private void EncodeRoomCreationMessage(string message)
+    private void JoinRoom(Socket current, string sessionID, string sessionPassword)
     {
-        byte[] messageBytes = Encoding.ASCII.GetBytes(message);
-        serverSocket.Send(messageBytes);
+        if (activeSessions.TryGetValue(sessionID, out string correctPassword))
+        {
+            if (sessionPassword == correctPassword)
+            {
+                // Client provided the correct password
+                SendMessage(current, "JoinRoomAccepted");
+            }
+            else
+            {
+                // Client provided the wrong password
+                SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
+            }
+        }
+        else
+        {
+            // Session ID does not exist
+            SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
+        }
     }
+    private void ProcessRequestData(Socket current, int received)
+    {
+        // Convert received bytes into a text string.
+        byte[] recBuf = new byte[received];
+        Array.Copy(buffer, recBuf, received);
+        string text = Encoding.ASCII.GetString(recBuf);
+        Debug.Log("Received Text: " + text);
+
+        // Now we need to interpret the text and take action based on it.
+        InterpretData(current, text);
+    }
+    private void InterpretData(Socket current, string text)
+    {
+        
+        string[] splitData = text.Split(':');
+        if (splitData.Length < 2) // Not enough parts to interpret the command.
+        {
+            Debug.LogError("Invalid command received.");
+            return;
+        }
+
+     
+        string commandType = splitData[0];
+        switch (commandType)
+        {
+            case "CreateRoom":
+                if (splitData.Length == 3) // Ensure we have enough parts.
+                {
+                    CreateRoom(current, splitData[1], splitData[2]);
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid CreateRoom command format.");
+                }
+                break;
+            case "JoinRoom":
+                if (splitData.Length == 3) // Ensure we have enough parts.
+                {
+                    JoinRoom(current, splitData[1], splitData[2]);
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid JoinRoom command format.");
+                }
+                break;
+            default:
+                Debug.LogError($"Unknown command received: {commandType}");
+                break;
+        }
+    }
+    private void CreateRoom(Socket current, string sessionID, string sessionPassword)
+    {
+        if (!activeSessions.ContainsKey(sessionID))
+        {
+            activeSessions.Add(sessionID, sessionPassword);
+            SendMessage(current, "Room Created:Success");
+        }
+        else
+        {
+            SendMessage(current, "Room Created:Fail:Session ID already exists.");
+        }
+    }
+
+    
     #endregion
 
 
@@ -220,6 +304,7 @@ public class GameServer : MonoBehaviour
         }
 
         serverSocket.Close();
+       
     }
 
     private void OnApplicationQuit()

@@ -666,9 +666,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: NetworkManager, Assembly-CSharp
-        m_MethodName: StartServer
+      - m_Target: {fileID: 1361306641}
+        m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
+        m_MethodName: SendJoinRoomRequest
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -803,6 +803,18 @@ MonoBehaviour:
       - m_Target: {fileID: 1361306641}
         m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
         m_MethodName: ConnectToServer
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 1361306641}
+        m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
+        m_MethodName: GoToJoinRoomPage
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2240,9 +2252,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 820821409}
-        m_TargetAssemblyTypeName: GameServer, Assembly-CSharp
-        m_MethodName: CreateRoom
+      - m_Target: {fileID: 1361306641}
+        m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
+        m_MethodName: SendCreateRoomRequest
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2334,6 +2346,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 026aae0871821994dbc46d2d7002c376, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isRunning: 0
+  joinRoomDecision: 0
   port: 8888
   startGameBtn: {fileID: 715521850}
   quitGameBtn: {fileID: 1457077997}
@@ -2897,6 +2911,18 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+      - m_Target: {fileID: 1361306641}
+        m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
+        m_MethodName: ConnectToServer
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1253598547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3274,7 +3300,11 @@ MonoBehaviour:
   quitGameBtn: {fileID: 1457077997}
   createRoomBtn: {fileID: 1253598546}
   joinRoomBtn: {fileID: 268310682}
+  createRoomBtn2: {fileID: 750178017}
+  joinRoomBtn2: {fileID: 172009084}
   mainMenuBtn: {fileID: 1181256522}
+  createSessionIDField: {fileID: 15853999}
+  createSessionPasswordField: {fileID: 341172182}
   joinSessionIDField: {fileID: 331320037}
   joinSessionPasswordField: {fileID: 383475233}
   gameNameTxt: {fileID: 79643406}

@@ -21,10 +21,10 @@ public class GameClient : MonoBehaviour
     [SerializeField]
     private int serverPort = 7777;
     [SerializeField]
-    private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn, mainMenuBtn;
+    private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn, createRoomBtn2, joinRoomBtn2, mainMenuBtn;
     private bool receivedDebugMessage = false;
     [SerializeField]
-    private InputField joinSessionIDField, joinSessionPasswordField;
+    private InputField createSessionIDField, createSessionPasswordField, joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
     private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt;
 
@@ -45,6 +45,8 @@ public class GameClient : MonoBehaviour
             gameNameTxt.gameObject.SetActive(false);
             createRoomTxt.gameObject.SetActive(true);
         }
+
+       
     }
     public void ConnectToServer()
     {
@@ -114,9 +116,7 @@ public class GameClient : MonoBehaviour
         // Add any other logic you need when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
-            // Code here is running on the main thread
-            // Update your UI here
-
+           
             OnScreenConsole.Log(message);
         });
 
@@ -159,8 +159,53 @@ public class GameClient : MonoBehaviour
 
     #region Session Generation Logics
 
+    // Call this method when you want to create a room.
+    public void SendCreateRoomRequest()
+    {
+        string sessionID = createSessionIDField.text;
+        string sessionPassword = createSessionPasswordField.text;
+        string message = $"CreateRoom:{sessionID}:{sessionPassword}";
+        SendMessageToServer(message);
+    }
 
+    // Call this method when you want to join a room.
+    public void SendJoinRoomRequest()
+    {
+        string sessionID = joinSessionIDField.text;
+        string sessionPassword = joinSessionPasswordField.text;
+        string message = $"JoinRoom:{sessionID}:{sessionPassword}";
+        SendMessageToServer(message);
+    }
 
+    // This method sends a message to the server.
+    private void SendMessageToServer(string message)
+    {
+        if (clientSocket != null && clientSocket.Connected)
+        {
+            byte[] data = Encoding.ASCII.GetBytes(message);
+            clientSocket.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, null);
+        }
+        else
+        {
+            Debug.LogError("Cannot send data, socket is not connected!");
+            // You could also call ConnectToServer() here to try to reconnect
+        }
+    }
+
+    private void SendCallback(IAsyncResult AR)
+    {
+        try
+        {
+            // Complete sending the data to the server.
+            int bytesSent = clientSocket.EndSend(AR);
+            Debug.Log($"Sent {bytesSent} bytes to server.");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"Failed to send data to server: {e.Message}");
+           
+        }
+    }
     #endregion
 
 
@@ -172,13 +217,33 @@ public class GameClient : MonoBehaviour
         joinRoomBtn.gameObject.SetActive(true);
         mainMenuBtn.gameObject.SetActive(true);
     }
+    public void GoToJoinRoomPage()
+    {
+        startGameBtn.gameObject.SetActive(false);
+        quitGameBtn.gameObject.SetActive(false);
+        createRoomBtn.gameObject.SetActive(false);
+        joinRoomBtn.gameObject.SetActive(false);
+        createRoomBtn2.gameObject.SetActive(false);
+        joinRoomBtn2.gameObject.SetActive(true);
+        joinSessionIDField.gameObject.SetActive(true);
+        joinSessionPasswordField.gameObject.SetActive(true);
+        mainMenuBtn.gameObject.SetActive(true);
+    }
     public void BackToMenuUIChange()
     {
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
+        gameServer.createRoomBtn2.gameObject.SetActive(false);
+        gameServer.createSessionIDField.gameObject.SetActive(false);
+        gameServer.createSessionPasswordField.gameObject.SetActive(false);
         joinRoomBtn.gameObject.SetActive(false);
         mainMenuBtn.gameObject.SetActive(false);
+
+        if (gameServer.isRunning) //If I am the server, shut down myself and go back to the main menu
+        {
+            gameServer.QuitGame();
+        }
     }
     private void OnApplicationQuit()
     {
