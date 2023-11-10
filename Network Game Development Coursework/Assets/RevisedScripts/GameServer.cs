@@ -8,7 +8,7 @@ using System.Threading;
 using System.Text;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
-
+using System.Security.Cryptography;
 public class GameServer : MonoBehaviour
 {
     private Socket serverSocket;
@@ -20,6 +20,10 @@ public class GameServer : MonoBehaviour
     private int port = 7777;
     [SerializeField]
     private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn;
+    Dictionary<string, string> activeSessions=new Dictionary<string, string>();
+
+    [SerializeField]
+    private InputField createSessionIDField, createSessionPasswordField;
     private void Awake()
     {
         DontDestroyOnLoad(this);
@@ -167,6 +171,16 @@ public class GameServer : MonoBehaviour
             clientSockets.Remove(socket);
         }
     }
+
+    #region Session Generation
+
+   
+
+    #endregion
+
+
+
+
     private void CloseAllSockets()
     {
         foreach (Socket socket in clientSockets)

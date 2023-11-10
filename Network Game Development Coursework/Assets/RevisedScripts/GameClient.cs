@@ -23,6 +23,10 @@ public class GameClient : MonoBehaviour
     [SerializeField]
     private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn, mainMenuBtn;
     private bool receivedDebugMessage = false;
+    [SerializeField]
+    private InputField joinSessionIDField, joinSessionPasswordField;
+    [SerializeField]
+    private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt;
     private void Awake()
     {
         DontDestroyOnLoad(this);
