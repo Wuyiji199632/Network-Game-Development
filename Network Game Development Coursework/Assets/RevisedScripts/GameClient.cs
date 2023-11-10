@@ -27,6 +27,8 @@ public class GameClient : MonoBehaviour
     private InputField joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
     private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt;
+
+    public GameServer gameServer;
     private void Awake()
     {
         DontDestroyOnLoad(this);
@@ -35,7 +37,15 @@ public class GameClient : MonoBehaviour
     {
 
     }
-
+    private void Update()
+    {
+        //Change UI locally for the title texts
+        if (gameServer.isRunning)
+        {
+            gameNameTxt.gameObject.SetActive(false);
+            createRoomTxt.gameObject.SetActive(true);
+        }
+    }
     public void ConnectToServer()
     {
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -144,6 +154,16 @@ public class GameClient : MonoBehaviour
         }
 
     }
+
+
+
+    #region Session Generation Logics
+
+
+
+    #endregion
+
+
     public void GoToRoomCreationPage()
     {
         startGameBtn.gameObject.SetActive(false);

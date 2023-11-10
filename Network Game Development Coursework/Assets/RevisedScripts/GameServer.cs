@@ -12,15 +12,16 @@ using System.Security.Cryptography;
 public class GameServer : MonoBehaviour
 {
     private Socket serverSocket;
-    private bool isRunning;
+    public bool isRunning;
     private List<Socket> clientSockets = new List<Socket>();
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
     [SerializeField]
     private int port = 7777;
     [SerializeField]
-    private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn;
-    Dictionary<string, string> activeSessions=new Dictionary<string, string>();
+    private Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
+
+    public Dictionary<string, string> activeSessions=new Dictionary<string, string>();//Dictionary to store the active game sessions
 
     [SerializeField]
     private InputField createSessionIDField, createSessionPasswordField;
@@ -35,6 +36,10 @@ public class GameServer : MonoBehaviour
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
         joinRoomBtn.gameObject.SetActive(false);
+        createSessionIDField.gameObject.SetActive(false);
+        createSessionIDField.gameObject.SetActive(false);
+        createSessionPasswordField.gameObject.SetActive(false);
+
     }
 
     public void StartServer()
@@ -45,6 +50,13 @@ public class GameServer : MonoBehaviour
         serverSocket.Listen(10);
         isRunning = true;
         serverSocket.BeginAccept(AcceptCallback, null);
+
+        createSessionIDField.gameObject.SetActive(true);
+        createSessionPasswordField.gameObject.SetActive(true);
+        createRoomBtn.gameObject.SetActive(false);
+        joinRoomBtn.gameObject.SetActive(false);
+        createRoomBtn2.gameObject.SetActive(true);
+
         Debug.Log("Server started on port " + port);
     }
 
@@ -172,10 +184,28 @@ public class GameServer : MonoBehaviour
         }
     }
 
-    #region Session Generation
+    #region Session Generation Logics
 
+    public void CreateRoom()
+    {
+        string sessionID = createSessionIDField.text;
+        string sessionPassword = createSessionPasswordField.text;
+
+        BroadcastRoomCreation(sessionID, sessionPassword);
+        activeSessions.Add(sessionID, sessionPassword);
+    }
    
+    private void BroadcastRoomCreation(string sessionId, string sessionPassword)
+    {
+        string roomCreationMsg=$"Create session:{sessionId}:{sessionPassword}";
+        EncodeRoomCreationMessage(roomCreationMsg);
+    }
 
+    private void EncodeRoomCreationMessage(string message)
+    {
+        byte[] messageBytes = Encoding.ASCII.GetBytes(message);
+        serverSocket.Send(messageBytes);
+    }
     #endregion
 
 

@@ -2240,9 +2240,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
-        m_TargetAssemblyTypeName: NetworkManager, Assembly-CSharp
-        m_MethodName: StartServer
+      - m_Target: {fileID: 820821409}
+        m_TargetAssemblyTypeName: GameServer, Assembly-CSharp
+        m_MethodName: CreateRoom
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -2338,7 +2338,9 @@ MonoBehaviour:
   startGameBtn: {fileID: 715521850}
   quitGameBtn: {fileID: 1457077997}
   createRoomBtn: {fileID: 1253598546}
+  createRoomBtn2: {fileID: 750178017}
   joinRoomBtn: {fileID: 268310682}
+  joinRoomBtn2: {fileID: 172009084}
   createSessionIDField: {fileID: 15853999}
   createSessionPasswordField: {fileID: 341172182}
 --- !u!1 &912537132
@@ -3278,6 +3280,7 @@ MonoBehaviour:
   gameNameTxt: {fileID: 79643406}
   createRoomTxt: {fileID: 561287252}
   joinRoomTxt: {fileID: 515213144}
+  gameServer: {fileID: 820821409}
 --- !u!4 &1361306642
 Transform:
   m_ObjectHideFlags: 0
