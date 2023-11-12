@@ -12,6 +12,7 @@ using static System.Net.Mime.MediaTypeNames;
 
 public class GameClient : MonoBehaviour
 {
+    private string sessionID;
     private Socket clientSocket;
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
@@ -112,23 +113,32 @@ public class GameClient : MonoBehaviour
     private void OnServerMessageReceived(string message)
     {
         Debug.Log("Server Broadcast: " + message);
-        
-        // Add any other logic you need when a message is received here
+
+
+        if (message.StartsWith("Room Created:"))
+        {
+            string[] splitMessage = message.Split(':');
+            sessionID = splitMessage[1]; // Store the sessionID
+            Debug.Log($"Room created with session ID: {sessionID}");
+            // Update UI to show room as created or navigate to room screen
+        }
+
+        // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
            
             OnScreenConsole.Log(message);
         });
 
-        if (message.StartsWith("CLIENT DISCONNECTED:"))
+        if (message.StartsWith("HostDisconnected:"))
+        {
+            string sessionID = message.Split(':')[1];
+            // Handle the host disconnection here, such as updating the UI and navigating back to the lobby
+        }
+        else if (message.StartsWith("CLIENT DISCONNECTED:"))
         {
             string disconnectedClient = message.Substring("CLIENT DISCONNECTED:".Length);
             HandleClientDisconnection(disconnectedClient);
-        }
-        else
-        {
-            // Handle other types of messages
-            OnScreenConsole.Log("Server Broadcast: " + message);
         }
 
     }
@@ -153,6 +163,8 @@ public class GameClient : MonoBehaviour
             clientSocket.Close();
         }
 
+        
+
     }
 
 
@@ -162,9 +174,9 @@ public class GameClient : MonoBehaviour
     // Call this method when you want to create a room.
     public void SendCreateRoomRequest()
     {
-        string sessionID = createSessionIDField.text;
-        string sessionPassword = createSessionPasswordField.text;
-        string message = $"CreateRoom:{sessionID}:{sessionPassword}";
+        string roomID = createSessionIDField.text;
+        string roomPassword = createSessionPasswordField.text;
+        string message = $"CreateRoom:{roomID}:{roomPassword}";
         SendMessageToServer(message);
     }
 
@@ -237,12 +249,22 @@ public class GameClient : MonoBehaviour
         gameServer.createRoomBtn2.gameObject.SetActive(false);
         gameServer.createSessionIDField.gameObject.SetActive(false);
         gameServer.createSessionPasswordField.gameObject.SetActive(false);
+        joinSessionIDField.gameObject.SetActive(false);
+        joinSessionPasswordField.gameObject.SetActive(false);
         joinRoomBtn.gameObject.SetActive(false);
+        joinRoomBtn2.gameObject.SetActive(false);
         mainMenuBtn.gameObject.SetActive(false);
 
-        if (gameServer.isRunning) //If I am the server, shut down myself and go back to the main menu
+        
+    }
+    public void NotifyServerOnQuitOrBackToMenu(bool isQuittingGame)
+    {
+        string command = isQuittingGame ? "QuitGame" : "BackToMenu";
+        string message = $"{command}:{sessionID}";
+        SendMessageToServer(message);
+        if (isQuittingGame)
         {
-            gameServer.QuitGame();
+            QuitGame(); // This should handle the client shutdown logic.
         }
     }
     private void OnApplicationQuit()
@@ -254,6 +276,7 @@ public class GameClient : MonoBehaviour
 
         UnityEngine.Application.Quit();
         DisconnectFromServer();
+        
 
     }
 }

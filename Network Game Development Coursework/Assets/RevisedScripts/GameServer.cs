@@ -9,6 +9,18 @@ using System.Text;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Security.Cryptography;
+using System.Linq;
+
+
+public class GameSession
+{
+    public string SessionID { get; set; }
+    public string Password { get; set; }
+    public Socket HostSocket { get; set; }
+    public List<Socket> MemberSockets { get; set; } = new List<Socket>();
+}
+
+
 public class GameServer : MonoBehaviour
 {
     private Socket serverSocket;
@@ -21,7 +33,7 @@ public class GameServer : MonoBehaviour
     
     public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
-    public Dictionary<string, string> activeSessions=new Dictionary<string, string>();//Dictionary to store the active game sessions
+    public Dictionary<string, GameSession> activeSessions=new Dictionary<string, GameSession>();//Dictionary to store the active game sessions
 
    
     
@@ -114,7 +126,29 @@ public class GameServer : MonoBehaviour
         string disconnectMessage = "CLIENT DISCONNECTED:" + current.RemoteEndPoint.ToString();
         BroadcastMessage(disconnectMessage);
 
-        // Remove the socket from the list of client sockets.
+        // Check if the disconnected client is the host of any session
+        var session = activeSessions.Values.FirstOrDefault(s => s.HostSocket == current);
+        if (session != null)
+        {
+            foreach (var memberSocket in session.MemberSockets)
+            {
+                SendMessage(memberSocket, $"HostDisconnected:{session.SessionID}");
+                // Consider disconnecting the member here, or allow them to return to the lobby.
+            }
+            activeSessions.Remove(session.SessionID);
+        }
+        else
+        {
+            // If not a host, remove from the member list of the respective session
+            foreach (var s in activeSessions.Values)
+            {
+                if (s.MemberSockets.Remove(current))
+                {
+                    // Optionally, notify the host and other members that a player has left
+                    break;
+                }
+            }
+        }
         clientSockets.Remove(current);
         current.Close();
     }
@@ -186,9 +220,8 @@ public class GameServer : MonoBehaviour
         }
     }
 
-    #region Session Generation Logics
-
-    public void CreateRoom()
+    #region Session Communication Logics
+    /* public void CreateRoom()
     {
         string sessionID = createSessionIDField.text;
         string sessionPassword = createSessionPasswordField.text;
@@ -196,6 +229,7 @@ public class GameServer : MonoBehaviour
         if (!activeSessions.ContainsKey(sessionID))
         {
             activeSessions.Add(sessionID, sessionPassword);
+
             Debug.Log($"Session created with ID: {sessionID} and Password: {sessionPassword}");
         }
         else
@@ -203,16 +237,39 @@ public class GameServer : MonoBehaviour
             Debug.LogError("Session ID already exists.");
         }
 
-    }
+    }*/
 
-    private void JoinRoom(Socket current, string sessionID, string sessionPassword)
+    private void CreateRoom(Socket current, string roomID, string sessionPassword)
     {
-        if (activeSessions.TryGetValue(sessionID, out string correctPassword))
+        if (!activeSessions.ContainsKey(roomID))
         {
-            if (sessionPassword == correctPassword)
+            string sessionID = GenerateUniqueSessionID();
+            var newSession = new GameSession { SessionID = roomID, Password = sessionPassword, HostSocket = current };
+            activeSessions.Add(roomID, newSession);
+            Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
+            SendMessage(current, $"Room Created:Room Creation Succeeded with{sessionID}");
+            Debug.Log($"Room created with ID: {sessionID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+        }
+        else
+        {
+            SendMessage(current, "Room Created:Fail:Session ID already exists.");
+        }
+    }
+    private string GenerateUniqueSessionID()
+    {
+        
+        return Guid.NewGuid().ToString();
+    }
+    private void JoinRoom(Socket current, string roomID, string roomPassword)
+    {
+        Debug.Log($"Attempting to join session with ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+        Debug.Log($"Active Sessions count before join attempt: {activeSessions.Count}");
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            if (roomPassword==session.Password)
             {
-                // Client provided the correct password
-                SendMessage(current, "JoinRoomAccepted");
+                session.MemberSockets.Add(current); // Add the client to the room's member list
+                SendMessage(current, "JoinRoom Accepted");
             }
             else
             {
@@ -222,9 +279,11 @@ public class GameServer : MonoBehaviour
         }
         else
         {
-            // Session ID does not exist
+            //Debug.Log($"Active Sessions: {string.Join(", ", activeSessions.Keys)}");
             SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
         }
+
+
     }
     private void ProcessRequestData(Socket current, int received)
     {
@@ -271,29 +330,68 @@ public class GameServer : MonoBehaviour
                     SendMessage(current, "Error:Invalid JoinRoom command format.");
                 }
                 break;
+            case "QuitGame":
+            case "BackToMenu":
+                HandleClientLeaving(current, splitData[1], commandType == "QuitGame");
+                break;
+
             default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
         }
     }
-    private void CreateRoom(Socket current, string sessionID, string sessionPassword)
+
+    private void BroadcastMessageToSessionMembers(GameSession session, string message, Socket excludeSocket)
     {
-        if (!activeSessions.ContainsKey(sessionID))
+        foreach (var memberSocket in session.MemberSockets.Where(s => s != excludeSocket))
         {
-            activeSessions.Add(sessionID, sessionPassword);
-            SendMessage(current, "Room Created:Success");
-        }
-        else
-        {
-            SendMessage(current, "Room Created:Fail:Session ID already exists.");
+            SendMessage(memberSocket, message);
         }
     }
+    private void HandleClientLeaving(Socket current, string sessionID, bool isQuitting)
+    {
+        if (activeSessions.TryGetValue(sessionID, out GameSession session))
+        {
+            if (session.HostSocket == current)
+            {
+                // Host is leaving, inform members and close the session.
+                BroadcastMessageToSessionMembers(session, "Host has left the session. Returning to main menu.", null);
+                CloseSession(session);
+            }
+            else
+            {
+                // A member is leaving, inform the host and other members.
+                session.MemberSockets.Remove(current);
+                var leaveMessage = $"{current.RemoteEndPoint} has left the session.";
+                BroadcastMessageToSessionMembers(session, leaveMessage, current);
+                SendMessage(session.HostSocket, leaveMessage);
+            }
+        }
+        if (isQuitting)
+        {
+            current.Shutdown(SocketShutdown.Both);
+            current.Close();
+            clientSockets.Remove(current);
+        }
+    }
+    private void CloseSession(GameSession session)
+    {
+        foreach (var socket in session.MemberSockets)
+        {
+            try
+            {
+                socket.Shutdown(SocketShutdown.Both);
+                socket.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.Log($"Error closing socket: {ex.Message}");
+            }
+        }
+        activeSessions.Remove(session.SessionID);
+    }
 
-    
     #endregion
-
-
-
 
     private void CloseAllSockets()
     {
