@@ -717,6 +717,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 304871931}
+  - component: {fileID: 304871932}
   m_Layer: 0
   m_Name: Environment
   m_TagString: Untagged
@@ -742,6 +743,24 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &304871932
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304871929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 049ec2516e851b74abff8c4ed28d6710, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  quitGameBtn: {fileID: 1353486084}
+  mainMenuBtn: {fileID: 1165472674}
+  heavyBanditBtn: {fileID: 1022253101}
+  lightBanditBtn: {fileID: 53202191}
+  gameServer: {fileID: 0}
+  gameClient: {fileID: 0}
 --- !u!1 &438701136
 GameObject:
   m_ObjectHideFlags: 0
@@ -1096,7 +1115,7 @@ GameObject:
   - component: {fileID: 1150320419}
   - component: {fileID: 1150320418}
   m_Layer: 5
-  m_Name: Canvas
+  m_Name: Canvas2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1805,7 +1824,7 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 42
+    m_FontSize: 30
     m_FontStyle: 1
     m_BestFit: 0
     m_MinSize: 10
@@ -1816,7 +1835,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: Quit
+  m_Text: Quit Game
 --- !u!222 &1300482096
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2077,10 +2096,10 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 34
+    m_FontSize: 30
     m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
+    m_MinSize: 3
     m_MaxSize: 49
     m_Alignment: 4
     m_AlignByGeometry: 0

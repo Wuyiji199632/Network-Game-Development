@@ -12,7 +12,7 @@ using static System.Net.Mime.MediaTypeNames;
 
 public class GameClient : MonoBehaviour
 {
-    private string sessionID;
+    private string roomID;
     private Socket clientSocket;
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
@@ -30,9 +30,15 @@ public class GameClient : MonoBehaviour
     private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt;
 
     public GameServer gameServer;
+
+    public Button heavyBanditBtn, lightBanditBtn;
+
+    public Canvas canvas1, canvas2;
     private void Awake()
     {
         DontDestroyOnLoad(this);
+      
+
     }
     void Start()
     {
@@ -41,14 +47,16 @@ public class GameClient : MonoBehaviour
     private void Update()
     {
         //Change UI locally for the title texts
+
+        if(SceneManager.GetActiveScene().ToString()=="MainMenu")
         if (gameServer.isRunning)
         {
-            gameNameTxt.gameObject.SetActive(false);
-            createRoomTxt.gameObject.SetActive(true);
+            gameNameTxt?.gameObject.SetActive(false);
+            createRoomTxt?.gameObject.SetActive(true);
         }
 
-       
     }
+    
     public void ConnectToServer()
     {
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -102,7 +110,7 @@ public class GameClient : MonoBehaviour
         byte[] recBuf = new byte[received];
         Array.Copy(buffer, recBuf, received);
         string text = Encoding.ASCII.GetString(recBuf);
-        Debug.Log("Received: " + text);
+        Debug.Log($"Client Received: {text} from server");
 
 
 
@@ -113,13 +121,34 @@ public class GameClient : MonoBehaviour
     private void OnServerMessageReceived(string message)
     {
         Debug.Log("Server Broadcast: " + message);
+        if (message.StartsWith("CharacterSelectionUpdate:"))
+        {
+            // Split the message by ':' to get the different parts
+            string[] messageParts = message.Split(':');
+            // The second part of the message is the client's endpoint who selected the character
+            string selectingClientEndPoint = messageParts[1];
+            // The third part of the message is the name of the selected character
+            string selectedCharacter = messageParts[2];
 
+            // Log the selection information to the Unity console
+            Debug.Log($"{selectingClientEndPoint} has selected {selectedCharacter}");
 
-        if (message.StartsWith("Room Created:"))
+        }
+        if (message.StartsWith("SessionClosed:"))
+        {
+            string closedRoomID = message.Split(':')[1];
+            if (roomID == closedRoomID)
+            {
+                Debug.Log($"Session {roomID} has been successfully closed.");
+                roomID = null; 
+            }
+        }
+
+        if (message.StartsWith("RoomCreated:"))
         {
             string[] splitMessage = message.Split(':');
-            sessionID = splitMessage[1]; // Store the sessionID
-            Debug.Log($"Room created with session ID: {sessionID}");
+            roomID = splitMessage[1]; // Store the sessionID
+            Debug.Log($"Room created with room ID: {roomID}");
             // Update UI to show room as created or navigate to room screen
         }
 
@@ -142,6 +171,7 @@ public class GameClient : MonoBehaviour
         }
 
     }
+   
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -163,12 +193,7 @@ public class GameClient : MonoBehaviour
             clientSocket.Close();
         }
 
-        
-
     }
-
-
-
     #region Session Generation Logics
 
     // Call this method when you want to create a room.
@@ -177,15 +202,19 @@ public class GameClient : MonoBehaviour
         string roomID = createSessionIDField.text;
         string roomPassword = createSessionPasswordField.text;
         string message = $"CreateRoom:{roomID}:{roomPassword}";
+        canvas1.gameObject.SetActive(false);
+        canvas2.gameObject.SetActive(true);
         SendMessageToServer(message);
     }
 
     // Call this method when you want to join a room.
     public void SendJoinRoomRequest()
     {
-        string sessionID = joinSessionIDField.text;
-        string sessionPassword = joinSessionPasswordField.text;
-        string message = $"JoinRoom:{sessionID}:{sessionPassword}";
+        string roomID = joinSessionIDField.text;
+        string roomPassword = joinSessionPasswordField.text;
+        string message = $"JoinRoom:{roomID}:{roomPassword}";
+        canvas1.gameObject.SetActive(false);
+        canvas2.gameObject.SetActive(true);
         SendMessageToServer(message);
     }
 
@@ -196,6 +225,7 @@ public class GameClient : MonoBehaviour
         {
             byte[] data = Encoding.ASCII.GetBytes(message);
             clientSocket.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, null);
+            Debug.Log($"Attempting to send message: {message}");
         }
         else
         {
@@ -210,7 +240,7 @@ public class GameClient : MonoBehaviour
         {
             // Complete sending the data to the server.
             int bytesSent = clientSocket.EndSend(AR);
-            Debug.Log($"Sent {bytesSent} bytes to server.");
+            Debug.Log($"Sent {bytesSent} bytes to server. Message sent successfully.");
         }
         catch (Exception e)
         {
@@ -219,7 +249,15 @@ public class GameClient : MonoBehaviour
         }
     }
     #endregion
+    #region Character Selection Logics
 
+    public void SelectCharacter(string characterName)
+    {
+        string message = $"CharacterSelectionUpdate:{roomID}:{characterName}";
+        Debug.Log($"Attempting to send character selection message: {message}");
+        SendMessageToServer(message);
+    }
+    #endregion
 
     public void GoToRoomCreationPage()
     {
@@ -243,6 +281,8 @@ public class GameClient : MonoBehaviour
     }
     public void BackToMenuUIChange()
     {
+        canvas1.gameObject.SetActive(true);
+        canvas2.gameObject.SetActive(false);
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
@@ -257,27 +297,39 @@ public class GameClient : MonoBehaviour
 
         
     }
-    public void NotifyServerOnQuitOrBackToMenu(bool isQuittingGame)
-    {
-        string command = isQuittingGame ? "QuitGame" : "BackToMenu";
-        string message = $"{command}:{sessionID}";
-        SendMessageToServer(message);
-        if (isQuittingGame)
-        {
-            QuitGame(); // This should handle the client shutdown logic.
-        }
-    }
+    
     private void OnApplicationQuit()
     {
+        if (clientSocket != null && clientSocket.Connected)
+        {
+            string quitGameCommand = "QuitGame";
+            string message = $"{quitGameCommand}:{roomID}";
+            SendMessageToServer(message);
+
+            // Consider a slight delay or a confirmation mechanism here
+            // to ensure the message is sent before the application quits
+        }
+
+      
         DisconnectFromServer();
     }
     public void QuitGame()
     {
-
+        string quitGameCommand = "QuitGame";
+        string message = $"{quitGameCommand}:{roomID}";
+        SendMessageToServer(message);      
         UnityEngine.Application.Quit();
         DisconnectFromServer();
         
+    }
 
+    public void GoBackToMainMenu()
+    {
+        string toMenuCommand = "BackToMenu";
+        string message= $"{toMenuCommand}:{roomID}";
+        SendMessageToServer(message);       
+        DisconnectFromServer();
+        SceneManager.LoadScene("MainMenu");
     }
 }
 

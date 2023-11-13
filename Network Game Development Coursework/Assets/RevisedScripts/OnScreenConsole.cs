@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 public class OnScreenConsole : MonoBehaviour
 {
@@ -25,6 +26,7 @@ public class OnScreenConsole : MonoBehaviour
 
     public static void Log(string message)
     {
+        if (SceneManager.GetActiveScene().ToString() != "MainMenu") return;
         if (instance != null && instance.consoleText != null)
         {
             

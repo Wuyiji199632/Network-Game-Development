@@ -14,10 +14,12 @@ using System.Linq;
 
 public class GameSession
 {
-    public string SessionID { get; set; }
+    public string RoomID { get; set; } //This is actually the room id for a specific room
     public string Password { get; set; }
     public Socket HostSocket { get; set; }
     public List<Socket> MemberSockets { get; set; } = new List<Socket>();
+
+    public Dictionary<Socket, string> PlayerCharacters { get; set; } = new Dictionary<Socket, string>();
 }
 
 
@@ -34,17 +36,20 @@ public class GameServer : MonoBehaviour
     public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
     public Dictionary<string, GameSession> activeSessions=new Dictionary<string, GameSession>();//Dictionary to store the active game sessions
-
    
-    
+    public List<string> AvailableCharacters = new List<string> {"HeavyBandit", "LightBandit"};
+
+
     public InputField createSessionIDField, createSessionPasswordField;
     private void Awake()
     {
         DontDestroyOnLoad(this);
+       
+       
     }
     void Start()
     {
-        //StartServer();
+        
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
@@ -52,6 +57,8 @@ public class GameServer : MonoBehaviour
         createSessionIDField.gameObject.SetActive(false);
         createSessionIDField.gameObject.SetActive(false);
         createSessionPasswordField.gameObject.SetActive(false);
+
+       
 
     }
 
@@ -64,15 +71,18 @@ public class GameServer : MonoBehaviour
         isRunning = true;
         serverSocket.BeginAccept(AcceptCallback, null);
 
+
         createSessionIDField.gameObject.SetActive(true);
         createSessionPasswordField.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
         joinRoomBtn.gameObject.SetActive(false);
         createRoomBtn2.gameObject.SetActive(true);
 
+
         Debug.Log("Server started on port " + port);
     }
 
+   
 
     private void AcceptCallback(IAsyncResult AR)
     {
@@ -132,10 +142,10 @@ public class GameServer : MonoBehaviour
         {
             foreach (var memberSocket in session.MemberSockets)
             {
-                SendMessage(memberSocket, $"HostDisconnected:{session.SessionID}");
+                SendMessage(memberSocket, $"HostDisconnected:{session.RoomID}");
                 // Consider disconnecting the member here, or allow them to return to the lobby.
             }
-            activeSessions.Remove(session.SessionID);
+            activeSessions.Remove(session.RoomID);
         }
         else
         {
@@ -152,6 +162,7 @@ public class GameServer : MonoBehaviour
         clientSockets.Remove(current);
         current.Close();
     }
+   
 
     private void ReceiveCallback(IAsyncResult AR)
     {
@@ -167,10 +178,14 @@ public class GameServer : MonoBehaviour
                 
                 return;
             }
-
             // Process the received data and prepare for the next message.
-            
             ProcessRequestData(current, received);
+
+            // Clear the buffer for accepting following messages
+            Array.Clear(buffer, 0, buffer.Length);
+
+            // Continue listening for new data from the client.
+            current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
 
         }
         catch (SocketException ex)
@@ -192,9 +207,9 @@ public class GameServer : MonoBehaviour
     }
     private void SendMessage(Socket socket, string message)
     {
+        byte[] data = Encoding.ASCII.GetBytes(message);
         try
-        {
-            byte[] data = Encoding.ASCII.GetBytes(message);
+        {            
             socket.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, socket);
         }
         catch (SocketException e)
@@ -221,39 +236,25 @@ public class GameServer : MonoBehaviour
     }
 
     #region Session Communication Logics
-    /* public void CreateRoom()
-    {
-        string sessionID = createSessionIDField.text;
-        string sessionPassword = createSessionPasswordField.text;
+   
 
-        if (!activeSessions.ContainsKey(sessionID))
-        {
-            activeSessions.Add(sessionID, sessionPassword);
-
-            Debug.Log($"Session created with ID: {sessionID} and Password: {sessionPassword}");
-        }
-        else
-        {
-            Debug.LogError("Session ID already exists.");
-        }
-
-    }*/
-
-    private void CreateRoom(Socket current, string roomID, string sessionPassword)
+    private void CreateRoom(Socket current, string roomID, string roomPassword)
     {
         if (!activeSessions.ContainsKey(roomID))
         {
             string sessionID = GenerateUniqueSessionID();
-            var newSession = new GameSession { SessionID = roomID, Password = sessionPassword, HostSocket = current };
+            var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
             activeSessions.Add(roomID, newSession);
             Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
-            SendMessage(current, $"Room Created:Room Creation Succeeded with{sessionID}");
-            Debug.Log($"Room created with ID: {sessionID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+            SendMessage(current, $"RoomCreated:{roomID}");
+            Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
         }
         else
         {
             SendMessage(current, "Room Created:Fail:Session ID already exists.");
         }
+
+       
     }
     private string GenerateUniqueSessionID()
     {
@@ -262,8 +263,9 @@ public class GameServer : MonoBehaviour
     }
     private void JoinRoom(Socket current, string roomID, string roomPassword)
     {
-        Debug.Log($"Attempting to join session with ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+        Debug.Log($"Attempting to join session with room ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
         Debug.Log($"Active Sessions count before join attempt: {activeSessions.Count}");
+       
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
             if (roomPassword==session.Password)
@@ -300,6 +302,7 @@ public class GameServer : MonoBehaviour
     {
         
         string[] splitData = text.Split(':');
+        Debug.Log("Interpreting Data: " + text);
         if (splitData.Length < 2) // Not enough parts to interpret the command.
         {
             Debug.LogError("Invalid command received.");
@@ -314,6 +317,7 @@ public class GameServer : MonoBehaviour
                 if (splitData.Length == 3) // Ensure we have enough parts.
                 {
                     CreateRoom(current, splitData[1], splitData[2]);
+                    
                 }
                 else
                 {
@@ -324,6 +328,7 @@ public class GameServer : MonoBehaviour
                 if (splitData.Length == 3) // Ensure we have enough parts.
                 {
                     JoinRoom(current, splitData[1], splitData[2]);
+                    
                 }
                 else
                 {
@@ -332,26 +337,141 @@ public class GameServer : MonoBehaviour
                 break;
             case "QuitGame":
             case "BackToMenu":
-                HandleClientLeaving(current, splitData[1], commandType == "QuitGame");
+                string sessionId = splitData.Length > 1 ? splitData[1] : null;
+                if (!string.IsNullOrEmpty(sessionId) && IsHost(current, sessionId))
+                {
+                    HandleHostLeaving(current, sessionId);
+                }
+                else if(!IsHost(current, sessionId))
+                {
+                    HandleClientLeaving(current, sessionId);
+                }
+                else
+                {
+                    // Send an error message back to the client if the session ID is missing or incorrect
+                    SendMessage(current, "Error: Session ID is missing or incorrect.");
+                }
                 break;
 
+            case "CharacterSelectionUpdate":
+                
+                if (splitData.Length == 3)
+                {
+                   
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+                    SelectCharacter(current, roomID, characterName);
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid SelectCharacter command format.");
+                }
+                break;
             default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
         }
     }
+    private void SelectCharacter(Socket current, string roomID, string characterName)
+    {
+        try
+        {
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+                if (!session.PlayerCharacters.Values.Contains(characterName))
+                {
+                    session.PlayerCharacters[current] = characterName;
+                    string response = $"CharacterSelected:{characterName}";
+                    SendMessage(current, response);
+                    Debug.Log($"Sending response to client: {response}");
+                    BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{current.RemoteEndPoint}:{characterName}", current);
+                }
+                else
+                {
+                    SendMessage(current, $"CharacterSelectionFailed:{characterName} is already selected.");
+                }
+            }
+            else
+            {
+                SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error in SelectCharacter: " + ex.Message);
+        }
 
+    }
     private void BroadcastMessageToSessionMembers(GameSession session, string message, Socket excludeSocket)
     {
-        foreach (var memberSocket in session.MemberSockets.Where(s => s != excludeSocket))
+        Debug.Log($"Broadcasting message to session members (excluding {excludeSocket?.RemoteEndPoint}): {message}");
+        foreach (var memberSocket in session.MemberSockets)
         {
-            SendMessage(memberSocket, message);
+            if (memberSocket != excludeSocket)
+            {
+                Debug.Log($"Sending to {memberSocket.RemoteEndPoint}");
+                SendMessage(memberSocket, message);
+            }
         }
     }
-    private void HandleClientLeaving(Socket current, string sessionID, bool isQuitting)
+    private void HandleHostLeaving(Socket hostSocket, string roomID)
     {
-        if (activeSessions.TryGetValue(sessionID, out GameSession session))
+        if (string.IsNullOrEmpty(roomID))
         {
+            Debug.LogError("Session ID is null or empty in HandleHostLeaving.");
+            return;
+        }
+
+        if (activeSessions.TryGetValue(roomID, out var session))
+        {
+            CloseSession(session);
+            activeSessions.Remove(roomID);
+            SendMessage(hostSocket, $"SessionClosed:{roomID}");
+            // Inform all members that the host has left and the session is closing
+            BroadcastMessageToSessionMembers(session, "Host has disconnected. Session is closing.", hostSocket);
+
+            // Close the member sockets and remove them from the list
+            foreach (var memberSocket in session.MemberSockets)
+            {
+                try
+                {
+                    memberSocket.Shutdown(SocketShutdown.Both);
+                    memberSocket.Close();
+                    clientSockets.Remove(memberSocket);
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Error closing member socket: {ex.Message}");
+                }
+            }
+
+            // Close the host socket
+            try
+            {
+                session.HostSocket.Shutdown(SocketShutdown.Both);
+                session.HostSocket.Close();
+                clientSockets.Remove(hostSocket);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error closing host socket: {ex.Message}");
+            }
+
+          
+            Debug.Log($"Session {session.RoomID} closed because the host has left.");
+        }
+        else
+        {
+            Debug.LogError($"Failed to find session with ID: {roomID}.");
+        }
+
+    }
+
+    private void HandleClientLeaving(Socket current, string roomID)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+          
             if (session.HostSocket == current)
             {
                 // Host is leaving, inform members and close the session.
@@ -367,15 +487,12 @@ public class GameServer : MonoBehaviour
                 SendMessage(session.HostSocket, leaveMessage);
             }
         }
-        if (isQuitting)
-        {
-            current.Shutdown(SocketShutdown.Both);
-            current.Close();
-            clientSockets.Remove(current);
-        }
+       
+        Debug.Log($"Processed client leaving: {current.RemoteEndPoint}");
     }
     private void CloseSession(GameSession session)
     {
+        // Close all member sockets
         foreach (var socket in session.MemberSockets)
         {
             try
@@ -385,12 +502,32 @@ public class GameServer : MonoBehaviour
             }
             catch (Exception ex)
             {
-                Debug.Log($"Error closing socket: {ex.Message}");
+                Debug.LogError($"Error closing socket: {ex.Message}");
             }
         }
-        activeSessions.Remove(session.SessionID);
-    }
 
+        // Close the host socket if it is still connected
+        if (session.HostSocket != null && session.HostSocket.Connected)
+        {
+            try
+            {
+                session.HostSocket.Shutdown(SocketShutdown.Both);
+                session.HostSocket.Close();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Error closing host socket: {ex.Message}");
+            }
+        }
+
+        // Remove the session from the active sessions
+        activeSessions.Remove(session.RoomID);
+        Debug.Log($"Session {session.RoomID} has been closed.");
+    }
+    private bool IsHost(Socket current, string roomID)
+    {
+        return activeSessions.TryGetValue(roomID, out var session) && session.HostSocket == current;
+    }
     #endregion
 
     private void CloseAllSockets()
