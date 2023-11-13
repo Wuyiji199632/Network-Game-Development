@@ -181,7 +181,7 @@ public class GameServer : MonoBehaviour
             // Process the received data and prepare for the next message.
             ProcessRequestData(current, received);
 
-            // Clear the buffer for accepting following messages
+            // Clear the buffer for accepting following messages, this is an important step because without it the buffer will be clogged with the previous data and incoming data will not be passed into it
             Array.Clear(buffer, 0, buffer.Length);
 
             // Continue listening for new data from the client.
