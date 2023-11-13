@@ -8,6 +8,7 @@ public class OnScreenConsole : MonoBehaviour
 {
     public Text consoleText;
     private static OnScreenConsole instance;
+    
 
     private void Awake()
     {

@@ -25,6 +25,7 @@ public class GameSession
 
 public class GameServer : MonoBehaviour
 {
+    public static GameServer Instance;
     private Socket serverSocket;
     public bool isRunning,joinRoomDecision;
     private List<Socket> clientSockets = new List<Socket>();
@@ -41,11 +42,17 @@ public class GameServer : MonoBehaviour
 
 
     public InputField createSessionIDField, createSessionPasswordField;
+    public Button startGameButton;
+
+    private readonly object characterSelectLock = new object();
+
+    private Queue<Action> characterSelectionQueue = new Queue<Action>();
+    private bool isProcessingCharacterSelection = false;
     private void Awake()
     {
+        
         DontDestroyOnLoad(this);
-       
-       
+
     }
     void Start()
     {
@@ -58,8 +65,14 @@ public class GameServer : MonoBehaviour
         createSessionIDField.gameObject.SetActive(false);
         createSessionPasswordField.gameObject.SetActive(false);
 
-       
 
+        startGameButton.gameObject.SetActive(false);
+        startGameButton.onClick.AddListener(OnStartGameClicked);
+    }
+
+    private void OnStartGameClicked()
+    {
+        Debug.Log("Get ready to start game!");
     }
 
     public void StartServer()
@@ -360,11 +373,24 @@ public class GameServer : MonoBehaviour
                    
                     string roomID = splitData[1];
                     string characterName = splitData[2];
-                    SelectCharacter(current, roomID, characterName);
+                    QueueCharacterSelection(current, roomID, characterName);
                 }
                 else
                 {
                     SendMessage(current, "Error:Invalid SelectCharacter command format.");
+                }
+                break;
+            case "CharacterSelectionFailed":
+                if (splitData.Length == 2)
+                {
+                    string failedCharacterName = splitData[1];
+                    // Handle the character selection failure here
+                    // You might want to log this information or notify the client accordingly
+                    Debug.Log($"Character selection failed for {failedCharacterName}, because another player has selected it");
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid CharacterSelectionFailed command format.");
                 }
                 break;
             default:
@@ -372,35 +398,88 @@ public class GameServer : MonoBehaviour
                 break;
         }
     }
-    private void SelectCharacter(Socket current, string roomID, string characterName)
+    #region Character Selection Logics
+
+    private void QueueCharacterSelection(Socket current, string roomID, string characterName)
     {
-        try
+        lock (characterSelectionQueue)
         {
-            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            characterSelectionQueue.Enqueue(() => SelectCharacter(current, roomID, characterName));
+            if (!isProcessingCharacterSelection)
             {
-                if (!session.PlayerCharacters.Values.Contains(characterName))
-                {
-                    session.PlayerCharacters[current] = characterName;
-                    string response = $"CharacterSelected:{characterName}";
-                    SendMessage(current, response);
-                    Debug.Log($"Sending response to client: {response}");
-                    BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{current.RemoteEndPoint}:{characterName}", current);
-                }
-                else
-                {
-                    SendMessage(current, $"CharacterSelectionFailed:{characterName} is already selected.");
-                }
+                ProcessNextCharacterSelection();
+            }
+        }
+    }
+    private void ProcessNextCharacterSelection()
+    {
+        lock (characterSelectionQueue)
+        {
+            if (characterSelectionQueue.Count > 0)
+            {
+                isProcessingCharacterSelection = true;
+                var selectCharacterAction = characterSelectionQueue.Dequeue();
+                selectCharacterAction.Invoke();
             }
             else
             {
-                SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+                isProcessingCharacterSelection = false;
             }
         }
-        catch (Exception ex)
+    }
+    private void SelectCharacter(Socket current, string roomID, string characterName)
+    {
+        lock (characterSelectLock) //Ensure that only one thread executes this function at a time
         {
-            Debug.LogError("Error in SelectCharacter: " + ex.Message);
+            try
+            {
+                if (activeSessions.TryGetValue(roomID, out GameSession session))
+                {
+                    if (!session.PlayerCharacters.Values.Contains(characterName))
+                    {
+                        // Character is not yet selected by anyone else, so select it for the current player
+                        session.PlayerCharacters[current] = characterName;
+                        BroadcastCharacterSelection(session, current, characterName);
+
+                        // Check if all players have selected characters; if so, broadcast start game button
+                        if (session.PlayerCharacters.Count == session.MemberSockets.Count)
+                        {
+                            BroadcastStartGameButton(session);
+                        }
+                    }
+                    else
+                    {
+                        // Character is already selected by another player, inform the current player
+                        SendMessage(current, $"CharacterSelectionFailed:{characterName}");
+                    }
+                }
+                else
+                {
+                    SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("Error in SelectCharacter: " + ex.Message);
+            }
+            finally
+            {
+                ProcessNextCharacterSelection();
+            }
         }
 
+    }
+    private void BroadcastCharacterSelection(GameSession session, Socket characterSelector, string characterName)
+    {
+        string selectorEndpoint = characterSelector.RemoteEndPoint.ToString();
+        string message = $"CharacterSelectionUpdate:{selectorEndpoint}:{characterName}";
+
+        foreach (var memberSocket in session.MemberSockets)
+        {
+            Debug.Log($"Broadcasting character selection: {message}");
+
+            SendMessage(memberSocket, message);
+        }
     }
     private void BroadcastMessageToSessionMembers(GameSession session, string message, Socket excludeSocket)
     {
@@ -414,6 +493,16 @@ public class GameServer : MonoBehaviour
             }
         }
     }
+    private void BroadcastStartGameButton(GameSession session)
+    {
+        string message = "ShowStartGameButton";
+        foreach (var memberSocket in session.MemberSockets)
+        {
+            SendMessage(memberSocket, message);
+        }
+    }
+    #endregion
+
     private void HandleHostLeaving(Socket hostSocket, string roomID)
     {
         if (string.IsNullOrEmpty(roomID))

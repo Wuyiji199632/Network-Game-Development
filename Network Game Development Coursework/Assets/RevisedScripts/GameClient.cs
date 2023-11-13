@@ -12,6 +12,7 @@ using static System.Net.Mime.MediaTypeNames;
 
 public class GameClient : MonoBehaviour
 {
+    public static GameClient Instance;
     private string roomID;
     private Socket clientSocket;
     private const int BUFFER_SIZE = 2048;
@@ -34,11 +35,13 @@ public class GameClient : MonoBehaviour
     public Button heavyBanditBtn, lightBanditBtn;
 
     public Canvas canvas1, canvas2;
+    public Button startGameButton;
+
+    private Dictionary<Socket, List<byte>> clientMessageBuffers = new Dictionary<Socket, List<byte>>();//Ensure dynamic change for buffer sizes
     private void Awake()
     {
+       
         DontDestroyOnLoad(this);
-      
-
     }
     void Start()
     {
@@ -94,45 +97,75 @@ public class GameClient : MonoBehaviour
         try
         {
             received = current.EndReceive(AR);
+            if (received == 0)
+            {
+                Debug.Log("Server closed connection");
+                return;
+            }
+
+            // Process the received data
+            byte[] recBuf = new byte[received];
+            Array.Copy(buffer, recBuf, received);
+            string text = Encoding.ASCII.GetString(recBuf);
+            Debug.Log($"Client Received: {text} from server");
+
+            UnityMainThreadDispatcher.RunOnMainThread(() => OnServerMessageReceived(text));
         }
         catch (SocketException ex)
         {
             Debug.Log("Server closed connection: " + ex.Message);
             return;
         }
-
-        if (received == 0)
+        finally
         {
-            Debug.Log("Server closed connection");
-            return;
+            // Clear the buffer for accepting following messages
+            Array.Clear(buffer, 0, BUFFER_SIZE);
+
+            // Continue listening for new data from the server.
+            if (current != null && current.Connected)
+            {
+                current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
+            }
         }
+       
 
-        byte[] recBuf = new byte[received];
-        Array.Copy(buffer, recBuf, received);
-        string text = Encoding.ASCII.GetString(recBuf);
-        Debug.Log($"Client Received: {text} from server");
-
-
-
-        UnityMainThreadDispatcher.RunOnMainThread(() => OnServerMessageReceived(text));
-
-        current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
     }
     private void OnServerMessageReceived(string message)
     {
         Debug.Log("Server Broadcast: " + message);
+
+
+        if (message == "ShowStartGameButton")
+        {
+            UnityMainThreadDispatcher.RunOnMainThread(() =>
+            {
+                // Code to show the "Start Game" button
+                startGameButton.gameObject.SetActive(true);
+            });
+        }
+        if (message.StartsWith("CharacterSelectionFailed:"))
+        {
+            string characterName = message.Split(':')[1];
+            UnityMainThreadDispatcher.RunOnMainThread(() =>
+            {
+                Debug.Log($"Failed to select {characterName}. It is already selected by another player.");
+                // Here, update the UI to inform the player that the character selection has failed.
+            });
+        }
+
         if (message.StartsWith("CharacterSelectionUpdate:"))
         {
-            // Split the message by ':' to get the different parts
             string[] messageParts = message.Split(':');
-            // The second part of the message is the client's endpoint who selected the character
-            string selectingClientEndPoint = messageParts[1];
-            // The third part of the message is the name of the selected character
-            string selectedCharacter = messageParts[2];
-
-            // Log the selection information to the Unity console
-            Debug.Log($"{selectingClientEndPoint} has selected {selectedCharacter}");
-
+            if (messageParts.Length >= 3)
+            {
+                string selectingClientInfo = messageParts[1];
+                string selectedCharacter = messageParts[2];
+                Debug.Log($"{selectingClientInfo} has selected {selectedCharacter}");
+            }
+            else
+            {
+                Debug.LogError("CharacterSelectionUpdate message format error.");
+            }
         }
         if (message.StartsWith("SessionClosed:"))
         {
@@ -249,6 +282,8 @@ public class GameClient : MonoBehaviour
         }
     }
     #endregion
+
+
     #region Character Selection Logics
 
     public void SelectCharacter(string characterName)
@@ -257,6 +292,8 @@ public class GameClient : MonoBehaviour
         Debug.Log($"Attempting to send character selection message: {message}");
         SendMessageToServer(message);
     }
+
+    
     #endregion
 
     public void GoToRoomCreationPage()
@@ -329,7 +366,7 @@ public class GameClient : MonoBehaviour
         string message= $"{toMenuCommand}:{roomID}";
         SendMessageToServer(message);       
         DisconnectFromServer();
-        SceneManager.LoadScene("MainMenu");
+       
     }
 }
 
