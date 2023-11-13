@@ -4271,8 +4271,8 @@ MonoBehaviour:
   createRoomTxt: {fileID: 561287252}
   joinRoomTxt: {fileID: 515213144}
   gameServer: {fileID: 820821409}
-  heavyBanditBtn: {fileID: 0}
-  lightBanditBtn: {fileID: 0}
+  heavyBanditBtn: {fileID: 1063353872}
+  lightBanditBtn: {fileID: 1739481433}
   canvas1: {fileID: 1998710370}
   canvas2: {fileID: 2080754381}
   startGameButton: {fileID: 0}

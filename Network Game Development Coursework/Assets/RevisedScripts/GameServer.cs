@@ -10,6 +10,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Security.Cryptography;
 using System.Linq;
+using static System.Collections.Specialized.BitVector32;
 
 
 public class GameSession
@@ -258,9 +259,12 @@ public class GameServer : MonoBehaviour
             string sessionID = GenerateUniqueSessionID();
             var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
             activeSessions.Add(roomID, newSession);
+            newSession.MemberSockets.Add(current);
             Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
             SendMessage(current, $"RoomCreated:{roomID}");
+            SyncCharacterSelectionState(current, newSession);
             Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
+            Debug.Log($"Room {roomID} created. Number of MemberSockets after creation: {newSession.MemberSockets.Count}");
         }
         else
         {
@@ -284,7 +288,9 @@ public class GameServer : MonoBehaviour
             if (roomPassword==session.Password)
             {
                 session.MemberSockets.Add(current); // Add the client to the room's member list
+                Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, "JoinRoom Accepted");
+                SyncCharacterSelectionState(current, session);
             }
             else
             {
@@ -437,9 +443,11 @@ public class GameServer : MonoBehaviour
                 {
                     if (!session.PlayerCharacters.Values.Contains(characterName))
                     {
-                        // Character is not yet selected by anyone else, so select it for the current player
                         session.PlayerCharacters[current] = characterName;
-                        BroadcastCharacterSelection(session, current, characterName);
+                        BroadcastCharacterSelection(session,current,characterName);
+
+                        // Broadcast to other clients that character is selected
+                        BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{roomID}:{characterName}", current);
 
                         // Check if all players have selected characters; if so, broadcast start game button
                         if (session.PlayerCharacters.Count == session.MemberSockets.Count)
@@ -469,17 +477,29 @@ public class GameServer : MonoBehaviour
         }
 
     }
+    private void SyncCharacterSelectionState(Socket client, GameSession session)
+    {
+        foreach (var pair in session.PlayerCharacters)
+        {
+            string message = $"CharacterSelectionUpdate:{pair.Key.RemoteEndPoint}:{pair.Value}";
+            SendMessage(client, message);
+        }
+    }
+
     private void BroadcastCharacterSelection(GameSession session, Socket characterSelector, string characterName)
     {
+        Debug.Log($"BroadcastCharacterSelection called. Number of MemberSockets: {session.MemberSockets.Count}");
+
         string selectorEndpoint = characterSelector.RemoteEndPoint.ToString();
         string message = $"CharacterSelectionUpdate:{selectorEndpoint}:{characterName}";
 
         foreach (var memberSocket in session.MemberSockets)
         {
             Debug.Log($"Broadcasting character selection: {message}");
-
             SendMessage(memberSocket, message);
         }
+
+        Debug.Log("BroadcastCharacterSelection finished.");
     }
     private void BroadcastMessageToSessionMembers(GameSession session, string message, Socket excludeSocket)
     {

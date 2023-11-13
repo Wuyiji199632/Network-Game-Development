@@ -160,11 +160,9 @@ public class GameClient : MonoBehaviour
             {
                 string selectingClientInfo = messageParts[1];
                 string selectedCharacter = messageParts[2];
-                Debug.Log($"{selectingClientInfo} has selected {selectedCharacter}");
-            }
-            else
-            {
-                Debug.LogError("CharacterSelectionUpdate message format error.");
+                UpdateCharacterSelectionUI(selectedCharacter, true);
+                Debug.Log("Select Character.");
+               
             }
         }
         if (message.StartsWith("SessionClosed:"))
@@ -175,6 +173,7 @@ public class GameClient : MonoBehaviour
                 Debug.Log($"Session {roomID} has been successfully closed.");
                 roomID = null; 
             }
+            ResetCharacterSelectionUI();
         }
 
         if (message.StartsWith("RoomCreated:"))
@@ -204,7 +203,30 @@ public class GameClient : MonoBehaviour
         }
 
     }
-   
+
+    private void UpdateCharacterSelectionUI(string characterName, bool isSelected)
+    {
+        if (isSelected)
+        {
+            switch (characterName)
+            {
+                case "HeavyBandit":
+                    heavyBanditBtn.interactable = false;
+                    break;
+                case "LightBandit":
+                    lightBanditBtn.interactable = false;
+                    break;
+                    // Add cases for other characters
+            }
+        }
+    }
+    private void ResetCharacterSelectionUI()
+    {
+        // Reactivating all character buttons
+        heavyBanditBtn.interactable = true;
+        lightBanditBtn.interactable = true;
+        // Add reactivation for other character buttons
+    }
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -225,6 +247,7 @@ public class GameClient : MonoBehaviour
             clientSocket.Shutdown(SocketShutdown.Both);
             clientSocket.Close();
         }
+        ResetCharacterSelectionUI();
 
     }
     #region Session Generation Logics
@@ -232,6 +255,7 @@ public class GameClient : MonoBehaviour
     // Call this method when you want to create a room.
     public void SendCreateRoomRequest()
     {
+        ResetCharacterSelectionUI();
         string roomID = createSessionIDField.text;
         string roomPassword = createSessionPasswordField.text;
         string message = $"CreateRoom:{roomID}:{roomPassword}";
@@ -243,6 +267,7 @@ public class GameClient : MonoBehaviour
     // Call this method when you want to join a room.
     public void SendJoinRoomRequest()
     {
+        ResetCharacterSelectionUI();
         string roomID = joinSessionIDField.text;
         string roomPassword = joinSessionPasswordField.text;
         string message = $"JoinRoom:{roomID}:{roomPassword}";
@@ -366,7 +391,8 @@ public class GameClient : MonoBehaviour
         string message= $"{toMenuCommand}:{roomID}";
         SendMessageToServer(message);       
         DisconnectFromServer();
-       
+        ResetCharacterSelectionUI();
+
     }
 }
 
