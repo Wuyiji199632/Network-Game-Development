@@ -496,35 +496,21 @@ public class GameServer : MonoBehaviour
                 if (activeSessions.TryGetValue(roomID, out GameSession session))
                 {
                    
-                    bool isHostRequest = current == session.HostSocket;
-                    Debug.Log($"Is host requesting? {isHostRequest}");
+                  
                     if (!session.PlayerCharacters.Values.Contains(characterName))
                     {
                         session.PlayerCharacters[current] = characterName;
-                        if (isHostRequest) // If this is the request from the host
-                        {
-                            
-                            BroadcastCharacterSelection_Host(session, current, characterName);
 
-                            Debug.Log($"Character {characterName} selected for client {current.RemoteEndPoint}");
-                            // Broadcast to other clients that character is selected
-                            BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{roomID}:{characterName}", current);
+                        BroadcastCharacterSelection_Host(session, current, characterName);
 
-                            string message = $"CharacterSelectionUpdate:{roomID}:{characterName}";
-                            BroadcastMessageToSession(session, message);
-                        }
-                        else
-                        {
-                           
-                            BroadcastCharacterSelection_NonHost(session, current, characterName);
-                            // Broadcast to other clients that character is selected
-                            BroadcastMessageToSessionMembers(session, $"ProcessCharacterSelectionRequest:{roomID}:{characterName}", current);
+                        Debug.Log($"Character {characterName} selected for client {current.RemoteEndPoint}");
+                        // Broadcast to other clients that character is selected
+                        BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{roomID}:{characterName}", current);
 
-                            string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}";
-                            BroadcastMessageToSession(session, message);
-                        }
-                       
-                       
+                        string message = $"CharacterSelectionUpdate:{roomID}:{characterName}";
+                        BroadcastMessageToSession(session, message);
+
+
 
                         // Check if all players have selected characters; if so, broadcast start game button
                         if (session.PlayerCharacters.Count == session.MemberSockets.Count)
@@ -668,6 +654,7 @@ public class GameServer : MonoBehaviour
                 string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}:{current.RemoteEndPoint.ToString()}";
                 SendMessage(session.HostSocket, message);
                 Debug.Log("Forwarding message to host!");
+                session.PlayerCharacters[current] = characterName;
             }
             else
             {
@@ -758,9 +745,9 @@ public class GameServer : MonoBehaviour
                 Debug.Log($"Character selection found for this client.");
                 if (session.PlayerCharacters[current] == characterName)
                 {
-                    Debug.Log($"Cancelling character: {characterName}");
-                    session.PlayerCharacters.Remove(current);
+                    Debug.Log($"Cancelling character: {characterName}");                   
                     string message = $"CharacterSelectionCancelled:{roomID}:{characterName}";
+                    session.PlayerCharacters.Remove(current);
                     BroadcastCharacterSelectionCancellation(session, message);
                 }
                 else
@@ -770,7 +757,7 @@ public class GameServer : MonoBehaviour
             }
             else
             {
-                Debug.Log("Character selection not found for the current socket. Possible reasons: socket mismatch, character not added, or concurrent modification issue.");
+                Debug.Log($"Character selection not found for the current socket {current.RemoteEndPoint}. Possible reasons: socket mismatch, character not added, or concurrent modification issue.");
             }
             Debug.Log($"After CancelCharacterSelection: {session.PlayerCharacters.Count} characters selected in session {roomID}");
         }
