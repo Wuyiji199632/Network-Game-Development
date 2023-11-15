@@ -386,13 +386,49 @@ public class GameServer : MonoBehaviour
                     SendMessage(current, "Error:Invalid SelectCharacter command format.");
                 }
                 break;
-            case "CharacterSelectionFailed":
-                if (splitData.Length == 2)
+            case "CharacterSelectionConfirmed":
+                if (splitData.Length == 4) // Ensure we have enough parts
                 {
-                    string failedCharacterName = splitData[1];
-                    // Handle the character selection failure here
-                    // You might want to log this information or notify the client accordingly
-                    Debug.Log($"Character selection failed for {failedCharacterName}, because another player has selected it");
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+                    string clientEndpoint = splitData[3];
+                    HandleCharacterSelectionConfirmed(roomID, characterName, clientEndpoint);
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid CharacterSelectionConfirmed command format.");
+                }
+                break;
+            case "CheckCharacterSelection":
+                if (splitData.Length == 3)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+                    CheckCharacterSelection(current, roomID, characterName);
+                }
+                else
+                {
+                    SendMessage(current, "Error:Invalid CheckCharacterSelection command format.");
+                }
+                break;
+            case "ProcessCharacterSelectionRequest":
+                if (splitData.Length == 3)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+
+                    //ProcessCharacterSelectionRequest(current, roomID, characterName, requestingClientEndpoint);
+                    ForwardSelectionRequestToHost(current, roomID, characterName);
+                }
+              
+                break;
+            case "CharacterSelectionFailed":
+                if (splitData.Length == 4)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+                    string clientEndpoint = splitData[3];
+                    NotifyClientOfSelectionFailure(roomID, characterName, clientEndpoint);
                 }
                 else
                 {
@@ -477,6 +513,96 @@ public class GameServer : MonoBehaviour
         }
 
     }
+    private void ProcessCharacterSelectionRequest(Socket current, string roomID, string characterName, string requestingClientEndpoint)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            if (session.PlayerCharacters.Values.Contains(characterName))
+            {
+                // Character already selected, notify all clients in the session
+                BroadcastMessageToSession(session, $"CharacterSelectionFailed:{roomID}:{characterName}:{requestingClientEndpoint}");
+            }
+            else
+            {
+                // Character selection successful, update session and notify all clients
+                var selectingClient = FindClientByEndpoint(session, requestingClientEndpoint);
+                if (selectingClient != null)
+                {
+                    session.PlayerCharacters[selectingClient] = characterName;
+                    BroadcastMessageToSession(session, $"CharacterSelectionConfirmed:{roomID}:{characterName}:{requestingClientEndpoint}");
+                }
+                else
+                {
+                    SendMessage(current, "Error: Client not found in session.");
+                }
+            }
+        }
+        else
+        {
+            // Session not found, handle error
+            SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+        }
+    }
+
+    private void BroadcastMessageToSession(GameSession session, string message)
+    {
+        foreach (var client in session.MemberSockets)
+        {
+            SendMessage(client, message);
+        }
+        // Also send to host if not included in MemberSockets
+        if (!session.MemberSockets.Contains(session.HostSocket))
+        {
+            SendMessage(session.HostSocket, message);
+        }
+    }
+    private void HandleCharacterSelectionConfirmed(string roomID, string characterName, string clientEndpoint)
+    {
+        if (activeSessions.TryGetValue(roomID, out var session))
+        {
+            // Update the session with the new character selection
+            // Find the client socket using the endpoint string (clientEndpoint)
+            var selectingClient = FindClientByEndpoint(session, clientEndpoint);
+            if (selectingClient != null)
+            {
+                session.PlayerCharacters[selectingClient] = characterName;
+
+                // Broadcast the character selection to all clients in the session
+                BroadcastCharacterSelection(session, selectingClient, characterName);
+
+              
+            }
+        }
+    }
+    private Socket FindClientByEndpoint(GameSession session, string endpointString)
+    {
+        return session.MemberSockets.FirstOrDefault(s => s.RemoteEndPoint.ToString() == endpointString);
+    }
+    private void CheckCharacterSelection(Socket current, string roomID, string characterName)
+    {
+        if (activeSessions.TryGetValue(roomID, out var session))
+        {
+            if (session.PlayerCharacters.Values.Contains(characterName))
+            {
+                SendMessage(current, $"CharacterSelectionFailed:{characterName}");
+            }
+            else
+            {
+                SendMessage(current, $"CharacterSelectionAvailable:{characterName}");
+            }
+        }
+    }
+    private void NotifyClientOfSelectionFailure(string roomID, string characterName, string clientEndpoint)
+    {
+        if (activeSessions.TryGetValue(roomID, out var session))
+        {
+            var clientSocket = FindClientByEndpoint(session, clientEndpoint);
+            if (clientSocket != null)
+            {
+                SendMessage(clientSocket, $"CharacterSelectionFailed:{characterName}");
+            }
+        }
+    }
     private void SyncCharacterSelectionState(Socket client, GameSession session)
     {
         foreach (var pair in session.PlayerCharacters)
@@ -485,7 +611,31 @@ public class GameServer : MonoBehaviour
             SendMessage(client, message);
         }
     }
-
+    private void ForwardSelectionRequestToHost(Socket current, string roomID, string characterName)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            // Check if the requesting client is not the host
+            if (session.HostSocket != current)
+            {
+                // Forward the request to the host
+                string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}:{current.RemoteEndPoint.ToString()}";
+                SendMessage(session.HostSocket, message);
+                Debug.Log($"Forwarding message to host!"); //Issue pinpointed: this block never executes when the non-host client selects a character
+            }
+            else
+            {
+                QueueCharacterSelection(current, roomID, characterName);
+                Debug.Log($"I am the Host!");
+            }
+            Debug.Log($"The current socket is: {current.RemoteEndPoint}:The current host socket is{session.HostSocket.RemoteEndPoint}");
+        }
+        else
+        {
+            // Handle case where session doesn't exist
+            SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+        }
+    }
     private void BroadcastCharacterSelection(GameSession session, Socket characterSelector, string characterName)
     {
         Debug.Log($"BroadcastCharacterSelection called. Number of MemberSockets: {session.MemberSockets.Count}");
@@ -506,11 +656,11 @@ public class GameServer : MonoBehaviour
         Debug.Log($"Broadcasting message to session members (excluding {excludeSocket?.RemoteEndPoint}): {message}");
         foreach (var memberSocket in session.MemberSockets)
         {
-            if (memberSocket != excludeSocket)
-            {
-                Debug.Log($"Sending to {memberSocket.RemoteEndPoint}");
-                SendMessage(memberSocket, message);
-            }
+            SendMessage(memberSocket, message);
+        }
+        if (!session.MemberSockets.Contains(session.HostSocket))
+        {
+            SendMessage(session.HostSocket, message);
         }
     }
     private void BroadcastStartGameButton(GameSession session)
