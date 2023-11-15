@@ -292,6 +292,7 @@ public class GameServer : MonoBehaviour
                     session.NonHostSocket = current; // Assign non-host client
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
+               
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, $"JoinRoom Accepted:{roomID}");
                 SyncCharacterSelectionState(current, session);
@@ -494,15 +495,18 @@ public class GameServer : MonoBehaviour
                
                 if (activeSessions.TryGetValue(roomID, out GameSession session))
                 {
+                   
+                    bool isHostRequest = current == session.HostSocket;
+                    Debug.Log($"Is host requesting? {isHostRequest}");
                     if (!session.PlayerCharacters.Values.Contains(characterName))
                     {
                         session.PlayerCharacters[current] = characterName;
-                        BroadcastCharacterSelection(session,current,characterName);
-                        bool isHostRequest = current == session.HostSocket;
-                        Debug.Log($"Character {characterName} selected for client {current.RemoteEndPoint}");
-
-                        if(isHostRequest) // If this is the request from the host
+                        if (isHostRequest) // If this is the request from the host
                         {
+                            
+                            BroadcastCharacterSelection_Host(session, current, characterName);
+
+                            Debug.Log($"Character {characterName} selected for client {current.RemoteEndPoint}");
                             // Broadcast to other clients that character is selected
                             BroadcastMessageToSessionMembers(session, $"CharacterSelectionUpdate:{roomID}:{characterName}", current);
 
@@ -511,12 +515,15 @@ public class GameServer : MonoBehaviour
                         }
                         else
                         {
+                           
+                            BroadcastCharacterSelection_NonHost(session, current, characterName);
                             // Broadcast to other clients that character is selected
                             BroadcastMessageToSessionMembers(session, $"ProcessCharacterSelectionRequest:{roomID}:{characterName}", current);
 
                             string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}";
                             BroadcastMessageToSession(session, message);
                         }
+                       
                        
 
                         // Check if all players have selected characters; if so, broadcast start game button
@@ -606,7 +613,7 @@ public class GameServer : MonoBehaviour
                 session.PlayerCharacters[selectingClient] = characterName;
 
                 // Broadcast the character selection to all clients in the session
-                BroadcastCharacterSelection(session, selectingClient, characterName);
+                BroadcastCharacterSelection_Host(session, selectingClient, characterName);
 
               
             }
@@ -674,7 +681,7 @@ public class GameServer : MonoBehaviour
             SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
         }
     }
-    private void BroadcastCharacterSelection(GameSession session, Socket characterSelector, string characterName)
+    private void BroadcastCharacterSelection_Host(GameSession session, Socket characterSelector, string characterName)// For host client
     {
         Debug.Log($"BroadcastCharacterSelection called. Number of MemberSockets: {session.MemberSockets.Count}");
 
@@ -693,7 +700,28 @@ public class GameServer : MonoBehaviour
             SendMessage(session.HostSocket, message);
         }
 
-        Debug.Log("BroadcastCharacterSelection finished.");
+        Debug.Log("BroadcastCharacterSelection finished for host.");
+    }
+    private void BroadcastCharacterSelection_NonHost(GameSession session, Socket characterSelector, string characterName)// For host client
+    {
+        Debug.Log($"BroadcastCharacterSelection called for the non-host. Number of MemberSockets: {session.MemberSockets.Count}");
+
+        string selectorEndpoint = characterSelector.RemoteEndPoint.ToString();
+        string message = $"ProcessCharacterSelectionRequest:{selectorEndpoint}:{characterName}";
+
+        // Broadcast to all clients in the session
+        foreach (var memberSocket in session.MemberSockets)
+        {
+            SendMessage(memberSocket, message);
+        }
+
+        // Also send to host if not included in MemberSockets
+        if (!session.MemberSockets.Contains(session.HostSocket))
+        {
+            SendMessage(session.HostSocket, message);
+        }
+
+        Debug.Log("BroadcastCharacterSelection finished for non-host.");
     }
     private void BroadcastMessageToSessionMembers(GameSession session, string message, Socket excludeSocket)
     {
@@ -764,6 +792,7 @@ public class GameServer : MonoBehaviour
         {
             SendMessage(session.HostSocket, message);
         }
+        Debug.Log($"Broadcasting cancellation message: {message}");
     }
     #endregion
 

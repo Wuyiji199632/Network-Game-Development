@@ -385,7 +385,7 @@ public class GameClient : MonoBehaviour
                     // Add cases for other characters
             }
         }
-        
+        Debug.Log($"Updating UI for character {characterName} - Selected: {isSelected}");
 
     }
     private bool IsLocalClient(string clientInfo)
