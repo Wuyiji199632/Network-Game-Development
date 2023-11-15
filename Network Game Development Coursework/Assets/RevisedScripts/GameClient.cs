@@ -36,9 +36,13 @@ public class GameClient : MonoBehaviour
     public Button heavyBanditBtn, lightBanditBtn;
 
     public Canvas canvas1, canvas2;
-    public Button startGameButton;
+    
 
     private Dictionary<Socket, List<byte>> clientMessageBuffers = new Dictionary<Socket, List<byte>>();//Ensure dynamic change for buffer sizes
+
+    public GameObject afterSelectionBtn;
+
+    private string selectedCharacter = null;
     private void Awake()
     {
        
@@ -46,7 +50,7 @@ public class GameClient : MonoBehaviour
     }
     void Start()
     {
-
+        afterSelectionBtn.SetActive(false);
     }
     private void Update()
     {
@@ -145,70 +149,55 @@ public class GameClient : MonoBehaviour
         }*/
 
 
-        if (message.StartsWith("ProcessCharacterSelectionRequest:"))
+        if (message.StartsWith("ProcessCharacterSelectionRequest:"))//Non-host client
         {
-            // Only the host should receive and process this request
-            if (IsHost())
+            // the host should receive and process this request
+            string[] splitMessage = message.Split(':');
+            if (splitMessage.Length >= 4)
             {
-                string[] splitMessage = message.Split(':');
-                if (splitMessage.Length >= 4)
-                {
-                    string roomID = splitMessage[1];
-                    string characterName = splitMessage[2];
-                    string requestingClientEndpoint = splitMessage[3];
-                    ProcessCharacterSelectionRequest(roomID, characterName, requestingClientEndpoint);
-
-                    Debug.Log($"Character {characterName} selected, button disabled.");
-
-                }
-            }
-        }
-        if (message.StartsWith("CharacterSelectionConfirmed:"))
-        {
-            string[] messageParts = message.Split(':');
-            if (messageParts.Length >= 3)
-            {
-                string selectedCharacter = messageParts[2];
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                string requestingClientEndpoint = splitMessage[3];
+              
                 UnityMainThreadDispatcher.Instance.Enqueue(() =>
                 {
-                    UpdateCharacterSelectionUI(selectedCharacter, true);
-                    Debug.Log($"Character {selectedCharacter} selected, button disabled.");
+                    UpdateCharacterSelectionUI(characterName, true);
                 });
-            }
-        }
-        else if (message.StartsWith("CharacterSelectionFailed:"))
-        {
-            string characterName = message.Split(':')[1];
-            UnityMainThreadDispatcher.RunOnMainThread(() =>
-            {
-                // Optionally update UI to indicate failure
-                UpdateCharacterSelectionUI(characterName, false); // reset the UI
-                Debug.Log($"Failed to select {characterName}. It is already selected by another player.");
-            });
-        }
-       
-
-
-        if (message.StartsWith("CharacterSelectionUpdate:"))
-        {
-            string[] messageParts = message.Split(':');
-            if (messageParts.Length >= 3)
-            {
-                string selectingClientInfo = messageParts[1];
-                string selectedCharacter = messageParts[2];
-                UnityMainThreadDispatcher.Instance.Enqueue(() =>
-                {
-                    UpdateCharacterSelectionUI(selectedCharacter, true);
-                });
-               
-                
-                Debug.Log($"Character {selectedCharacter} selected, button disabled.");
+                Debug.Log($"Character {characterName} selected, button disabled.");
 
             }
             
         }
        
-        
+        if (message.StartsWith("CharacterSelectionUpdate:"))// Host client
+        {
+            string[] messageParts = message.Split(':');
+            if (messageParts.Length >= 3)
+            {
+                string roomID = messageParts[1];
+                string characterName = messageParts[2];
+
+                UnityMainThreadDispatcher.Instance.Enqueue(() =>
+                {
+                    UpdateCharacterSelectionUI(characterName, true);
+                });
+            }
+
+        }
+        Debug.Log($"Client Received Message: {message}");
+        if (message.StartsWith("CharacterSelectionCancelled:"))
+        {
+            string[] splitMessage = message.Split(':');
+            if (splitMessage.Length >= 3)
+            {
+                string cancelledCharacter = splitMessage[2];
+                UnityMainThreadDispatcher.Instance.Enqueue(() =>
+                {
+                    UpdateCharacterSelectionUI(cancelledCharacter, false);
+                });
+            }
+        }
+
         if (message.StartsWith("SessionClosed:"))
         {
             string closedRoomID = message.Split(':')[1];
@@ -227,7 +216,16 @@ public class GameClient : MonoBehaviour
             Debug.Log($"Room created with room ID: {roomID}");
             // Update UI to show room as created or navigate to room screen
         }
-
+        if (message.StartsWith("JoinRoom Accepted"))
+        {
+            // Assuming the message format is "JoinRoom Accepted:ROOM_ID"
+            string[] splitMessage = message.Split(':');
+            if (splitMessage.Length > 1)
+            {
+                roomID = splitMessage[1];
+                Debug.Log($"Joined room with ID: {roomID}");
+            }
+        }
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
@@ -337,25 +335,62 @@ public class GameClient : MonoBehaviour
     {
         string message = IsHost() ? $"CharacterSelectionUpdate:{roomID}:{characterName}" : $"ProcessCharacterSelectionRequest:{roomID}:{characterName}";
         Debug.Log($"Attempting to send character selection message: {message}");
+        selectedCharacter = characterName;
+        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        {
+            UpdateCharacterSelectionUI(characterName, true); //Ensure the local client's button is disabled
+            afterSelectionBtn.SetActive(true);
+        });
         SendMessageToServer(message);
+    }
+
+    public void CancelSelection()
+    {
+        if (!string.IsNullOrEmpty(selectedCharacter))
+        {
+            string message = $"CharacterCancelSelection:{roomID}:{selectedCharacter}";
+            SendMessageToServer(message);
+            Debug.Log($"Attempting to send character selection cancellation message: {message}");
+            UpdateCharacterSelectionUI(selectedCharacter, false);
+            selectedCharacter = null; // Reset selected character
+            afterSelectionBtn.SetActive(false); // Hide the cancel button
+        }
     }
    
     private void UpdateCharacterSelectionUI(string characterName, bool isSelected)
     {
-        if (isSelected)
+        if(isSelected)
         {
             switch (characterName)
             {
                 case "HeavyBandit":
-                    heavyBanditBtn.interactable = !isSelected;
+                    heavyBanditBtn.interactable = false;
                     break;
                 case "LightBandit":
-                    lightBanditBtn.interactable = !isSelected;
+                    lightBanditBtn.interactable = false;
                     break;
                     // Add cases for other characters
             }
         }
-       
+        else
+        {
+            switch (characterName)
+            {
+                case "HeavyBandit":
+                    heavyBanditBtn.interactable = true;
+                    break;
+                case "LightBandit":
+                    lightBanditBtn.interactable = true;
+                    break;
+                    // Add cases for other characters
+            }
+        }
+        
+
+    }
+    private bool IsLocalClient(string clientInfo)
+    {
+        return clientSocket.RemoteEndPoint.ToString() == clientInfo;
     }
     private void ResetCharacterSelectionUI()
     {
@@ -364,59 +399,6 @@ public class GameClient : MonoBehaviour
         lightBanditBtn.interactable = true;
         // Add reactivation for other character buttons
     }
-
-    private void ProcessCharacterSelectionRequest(string roomID, string characterName, string requestingClientEndpoint)
-    {
-        // Check if the character is already selected in the session
-        if (IsCharacterAlreadySelected(roomID, characterName))
-        {
-            // Notify the server to send a failure message to the requesting client
-            SendMessageToServer($"CharacterSelectionFailed:{roomID}:{characterName}:{requestingClientEndpoint}");
-            UnityMainThreadDispatcher.Instance.Enqueue(() =>
-            {
-                UpdateCharacterSelectionUI(characterName, true);
-            });
-
-        }
-        else
-        {
-            // Notify the server to update the character selection and inform all clients
-            SendMessageToServer($"CharacterSelectionConfirmed:{roomID}:{characterName}:{requestingClientEndpoint}");
-        }
-    }
-
-    private bool IsCharacterAlreadySelected(string roomID, string characterName)
-    {
-        // This client cannot directly check if a character is already selected in the session
-        // Instead, send a request to the server to check this
-        SendMessageToServer($"CheckCharacterSelection:{roomID}:{characterName}");
-        return false; // Temporarily return false, actual logic depends on server response
-    }
-
-
-    private void UpdateCharacterSelection(string roomID, string characterName, Socket clientSocket)
-    {
-        // Update the character selection in the session
-        if (gameServer.activeSessions.TryGetValue(roomID, out var session))
-        {
-            session.PlayerCharacters[clientSocket] = characterName;
-        }
-    }
-
-    private void BroadcastCharacterSelectionUpdate(string roomID, string characterName, Socket clientSocket)
-    {
-        // Send an update to all clients in the session about the new character selection
-        if (gameServer.activeSessions.TryGetValue(roomID, out var session))
-        {
-            string clientEndpointString = clientSocket.RemoteEndPoint.ToString();
-            foreach (var memberSocket in session.MemberSockets)
-            {
-                SendMessage(memberSocket.RemoteEndPoint.ToString(), $"CharacterSelectionUpdate:{roomID}:{characterName}:{clientEndpointString}");
-            }
-        }
-    }
-
-
 
     #endregion
 
