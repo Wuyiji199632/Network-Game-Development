@@ -18,6 +18,8 @@ public class GameSession
     public string RoomID { get; set; } //This is actually the room id for a specific room
     public string Password { get; set; }
     public Socket HostSocket { get; set; }
+
+    public Socket NonHostSocket { get; set; }
     public List<Socket> MemberSockets { get; set; } = new List<Socket>();
 
     public Dictionary<Socket, string> PlayerCharacters { get; set; } = new Dictionary<Socket, string>();
@@ -287,6 +289,10 @@ public class GameServer : MonoBehaviour
         {
             if (roomPassword==session.Password)
             {
+                if (session.HostSocket != current)
+                {
+                    session.NonHostSocket = current; // Assign non-host client
+                }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, "JoinRoom Accepted");
@@ -615,24 +621,22 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-            // Check if the requesting client is not the host
-            if (session.HostSocket != current)
+            Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
+
+            if (current != session.HostSocket)
             {
-                // Forward the request to the host
                 string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}:{current.RemoteEndPoint.ToString()}";
                 SendMessage(session.HostSocket, message);
-                Debug.Log($"Forwarding message to host!"); //Issue pinpointed: this block never executes when the non-host client selects a character
+                Debug.Log("Forwarding message to host!");
             }
             else
             {
+                Debug.Log("Current client is the host, processing directly.");
                 QueueCharacterSelection(current, roomID, characterName);
-                Debug.Log($"I am the Host!");
             }
-            Debug.Log($"The current socket is: {current.RemoteEndPoint}:The current host socket is{session.HostSocket.RemoteEndPoint}");
         }
         else
         {
-            // Handle case where session doesn't exist
             SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
         }
     }
