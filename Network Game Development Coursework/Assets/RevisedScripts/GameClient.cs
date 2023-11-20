@@ -49,8 +49,7 @@ public class GameClient : MonoBehaviour
 
     private string localClientId=string.Empty;
 
-    private bool localClientReady = false;
-    private bool opponentReady = false;
+    private bool isLocalUpdate=false;
 
     private void Awake()
     {
@@ -73,7 +72,7 @@ public class GameClient : MonoBehaviour
             gameNameTxt?.gameObject.SetActive(false);
             createRoomTxt?.gameObject.SetActive(true);
         }
-
+        
     }
     
     public void ConnectToServer()
@@ -150,11 +149,17 @@ public class GameClient : MonoBehaviour
     {
         Debug.Log("Server Broadcast: " + message);
 
-        if (message.StartsWith("SetClientId:"))
+        if (message.StartsWith("SetHostClientId:"))
         {
             string[] splitMessage= message.Split(':');
-            localClientId = message.Substring("SetClientId:".Length);
-            Debug.Log($"Client ID set: {localClientId}");
+            localClientId = message.Substring("SetHostClientId:".Length);
+            Debug.Log($"Host Client ID set: {localClientId}");
+            return; // Exit the method to avoid processing the rest of the function
+        }else if (message.StartsWith("SetNonHostClientId"))
+        {
+            string[] splitMessage = message.Split(':');
+            localClientId = message.Substring("SetNonHostClientId:".Length);
+            Debug.Log($"Non Host Client ID set: {localClientId}");
             return; // Exit the method to avoid processing the rest of the function
         }
 
@@ -237,22 +242,34 @@ public class GameClient : MonoBehaviour
                 Debug.Log($"Joined room with ID: {roomID}");
             }
         }
-        if (message.StartsWith("CharacterReadyUpdate:"))
+        if (message.StartsWith("HostCharacterReadyUpdate:")) //Rediness update for host
         {
             string[] splitMessage = message.Split(':');
-            if (splitMessage.Length >= 5)
+            if (splitMessage.Length >= 6)
             {
                 string roomID = splitMessage[1];
                 string characterName = splitMessage[2];
                 string readinessFlag = splitMessage[3];
-                string clientIdentifier = splitMessage[4];
-                //bool isForLocalClient = (IsHost() && readinessFlag == "Host") || (!IsHost() && readinessFlag == "Member");
-                // Ensure the update is for the opponent and not the local client
-                UpdateOpponentReadinessInfo(characterName, readinessFlag, clientIdentifier);
-
+                string memberIdentityFlag= splitMessage[4];
+                string clientIdentifier = splitMessage[5];                        
+                UpdateHostReadinessInfo(characterName, readinessFlag,clientIdentifier);
+             
             }
+          
+        }else if (message.StartsWith("NonHostCharacterReadyUpdate"))
+        {
+            string[] splitMessage = message.Split(':');
+            if (splitMessage.Length >= 6)
+            {
+                Debug.Log($"Hadnling UI elements for non host!");
 
-           
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                string readinessFlag = splitMessage[3];
+                string memberIdentityFlag = splitMessage[4];
+                string clientIdentifier = splitMessage[5];
+                UpdateNonHostReadinessInfo(characterName, readinessFlag, clientIdentifier);
+            }
         }
 
         // Add any logics needed when a message is received here
@@ -286,17 +303,31 @@ public class GameClient : MonoBehaviour
     }
 
     // Update the readiness UI for the opponent client
-    private void UpdateOpponentReadinessInfo(string characterName, string readinessFlag, string clientIdentifier)
+    private void UpdateHostReadinessInfo(string characterName, string readinessFlag,string clientIdentifier)
     {
-
+        
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
             bool isOpponentReady = readinessFlag == "Ready";
             opponentReadyTxt.gameObject.SetActive(isOpponentReady);
-            opponentReadyTxt.text = clientIdentifier != localClientId ? $"Opponent is ready with character {characterName}" : string.Empty;
+            opponentReadyTxt.text = clientIdentifier != localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
+            Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
+
+
         });
     }
+    private void UpdateNonHostReadinessInfo(string characterName, string readinessFlag, string clientIdentifier)
+    {
+       
+        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        {
+            bool isOpponentReady = readinessFlag == "Ready";
+            opponentReadyTxt.gameObject.SetActive(isOpponentReady);
+            opponentReadyTxt.text = clientIdentifier == localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
+            Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
 
+        });
+    }
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -383,7 +414,7 @@ public class GameClient : MonoBehaviour
 
     public void SelectCharacter(string characterName)
     {
-        string message = IsHost() ? $"CharacterSelectionUpdate:{roomID}:{characterName}" : $"ProcessCharacterSelectionRequest:{roomID}:{characterName}";
+        string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}";
         Debug.Log($"Attempting to send character selection message: {message}");
         selectedCharacter = characterName;
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
@@ -411,14 +442,14 @@ public class GameClient : MonoBehaviour
     {
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
-             // This will clear the text on the main thread
-            
+            // This will clear the text on the main thread
+           opponentReadyTxt.text = string.Empty;
             if (!isReady)
             {
                 isReady = true;
                 if (!string.IsNullOrEmpty(selectedCharacter))
                 {
-                    string msg = $"CharacterIsReady:{roomID}:{selectedCharacter}";
+                    string msg =$"ProcessReadiness:{roomID}:{selectedCharacter}";
                     SendMessageToServer(msg);
                     Debug.Log($"Attempting to send character ready message: {msg}");
                     readyTxt.color = Color.green;
@@ -430,18 +461,18 @@ public class GameClient : MonoBehaviour
                 isReady = false;
                 if (!string.IsNullOrEmpty(selectedCharacter))
                 {
-                    string msg = $"CharacterCancelReadiness:{roomID}:{selectedCharacter}";
+                    string msg = $"ProcessCacelReadiness:{roomID}:{selectedCharacter}";
                     SendMessageToServer(msg);
                     Debug.Log($"Attempting to send cancel readiness message: {msg}");
                     readyTxt.color = Color.red;
                     // Other UI updates related to canceling readiness can be added here
                 }
             }
-           
+            
+
         });
     }
 
-   
    
     private void UpdateCharacterSelectionUI(string characterName, bool isSelected)
     {
@@ -528,14 +559,17 @@ public class GameClient : MonoBehaviour
     }
     private bool IsHost()
     {
-        // Compare the client's socket with the host's socket in the session
+        // Ensure the game server and room ID are valid
         if (gameServer == null || string.IsNullOrEmpty(roomID))
             return false;
 
-        if (!gameServer.activeSessions.TryGetValue(roomID, out var session))
-            return false;
-
-        return clientSocket == session.HostSocket;
+        // Try to get the session from the game server
+        if (gameServer.activeSessions.TryGetValue(roomID, out var session))
+        {
+            // Check if the current client's socket matches the host's socket in the session
+            return clientSocket.RemoteEndPoint.ToString() == session.HostSocket.RemoteEndPoint.ToString();
+        }
+        return false;
     }
     private void OnApplicationQuit()
     {

@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Security.Cryptography;
 using System.Linq;
-
+using System.Xml.Serialization;
 
 
 public class GameSession
@@ -54,6 +54,7 @@ public class GameServer : MonoBehaviour
     private Queue<Action> characterSelectionQueue = new Queue<Action>();
     private bool isProcessingCharacterSelection = false;
     [SerializeField] private Text opponentReadyTxt;
+    [SerializeField] private Button gameStartBtn;
     private void Awake()
     {
         
@@ -113,8 +114,7 @@ public class GameServer : MonoBehaviour
         {
             return;
         }
-        string[] uniqueClientId = socket.RemoteEndPoint.ToString().Split(":");
-        SendMessage(socket, $"SetClientId:{uniqueClientId[1]}");
+       
 
 
         // Now broadcast the message to all connected clients before adding the new client to the list
@@ -463,33 +463,31 @@ public class GameServer : MonoBehaviour
                     SendMessage(current, "Error:Invalid CharacterCancelSelection command format.");
                 }
                 break;
-            case "CharacterIsReady":
+            case "ProcessReadiness":
                 if (splitData.Length == 3)
                 {
                     string roomID = splitData[1];
                     string characterName = splitData[2];
-                    SetCharacterReady(current, roomID, characterName, true);
-                }
-                else
-                {
-                    SendMessage(current, "Error:Invalid CharacterIsReady command format.");
-                }
-                break;
-            case "CharacterCancelReadiness":
-                if (splitData.Length == 3)
-                {
-                    string roomID = splitData[1];
-                    string characterName = splitData[2];
-                    SetCharacterReady(current, roomID, characterName, false);
-                }
-                else
-                {
-                    SendMessage(current, "Error:Invalid CharacterCancelReadiness command format.");
-                }
-                break;
 
-           
-            default:
+                    if(IsHost(current,roomID))
+                        SetHostCharacterReady(current, roomID, characterName,true);
+                    else 
+                        SetNonHostCharacterReady(current,roomID, characterName, true);
+                }
+                    break;
+            case "ProcessCacelReadiness":
+
+                if (splitData.Length == 3)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+                    if (IsHost(current, roomID))
+                        SetHostCharacterReady(current, roomID, characterName, false);
+                    else
+                        SetNonHostCharacterReady(current, roomID, characterName, false);
+                }
+                    break;
+                    default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
         }
@@ -581,23 +579,26 @@ public class GameServer : MonoBehaviour
         }
 
     }
-    private void SetCharacterReady(Socket current, string roomID, string characterName, bool isReady)
+    private void SetHostCharacterReady(Socket current, string roomID, string characterName, bool isReady)
     {
         
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-            
-            // Update readiness status in your session data
-            // ...
 
-            // Broadcast readiness update to all members of the session
-            string readinessFlag = isReady ? "Ready" : "NotReady";
-            
-            string clientIdentifier = GetClientIdentifier(current);
-            string message = $"CharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{clientIdentifier}";
-            Debug.Log($"Current client identifier is {clientIdentifier}.");
-            Debug.Log($"Character readiness update: {message}");
-            BroadcastMessageToSession(session, message);
+           
+            if (IsHost(current, roomID))
+            {
+                string readinessFlag = isReady ? "Ready" : "NotReady";
+                string memberIdentityFlag = $"Host";
+                string clientIdentifier = GetClientIdentifier(current);
+                string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                SendMessage(current, $"SetHostClientId:{uniqueClientId[1]}");
+                string message = $"HostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                Debug.Log($"Current client identifier is {clientIdentifier}.");
+                Debug.Log($"Character readiness update: {message}");
+                BroadcastMessageToSession(session, message);
+            }
+           
         }
         else
         {
@@ -605,6 +606,28 @@ public class GameServer : MonoBehaviour
             SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
         }
     }
+    
+    private void SetNonHostCharacterReady(Socket current, string roomID, string characterName, bool isReady)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
+            if (!IsHost(current, roomID))
+            {
+                string readinessFlag = isReady ? "Ready" : "NotReady";
+                string memberIdentityFlag = $"Member";
+                string clientIdentifier = GetClientIdentifier(current);
+                string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                SendMessage(current, $"SetNonHostClientId:{uniqueClientId[1]}");
+                BroadcastMessageToSession(session, $"SetNonHostClientId:{uniqueClientId[1]}");
+                string msg = $"NonHostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                Debug.Log($"Current client identifier is {clientIdentifier}.");
+                Debug.Log($"Character readiness update: {msg}");
+                BroadcastMessageToSession(session, msg);
+            }
+        }
+    }
+    
     private string GetClientIdentifier(Socket clientSocket)
     {
         string[] msgSplit = clientSocket.RemoteEndPoint.ToString().Split(":");
@@ -916,7 +939,7 @@ public class GameServer : MonoBehaviour
         activeSessions.Remove(session.RoomID);
         Debug.Log($"Session {session.RoomID} has been closed.");
     }
-    private bool IsHost(Socket current, string roomID)
+    public bool IsHost(Socket current, string roomID)
     {
         return activeSessions.TryGetValue(roomID, out var session) && session.HostSocket == current;
     }
