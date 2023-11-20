@@ -11,6 +11,7 @@ using System.Threading;
 using static System.Net.Mime.MediaTypeNames;
 using System.Linq;
 
+
 public class GameClient : MonoBehaviour
 {
     public static GameClient Instance;
@@ -29,7 +30,7 @@ public class GameClient : MonoBehaviour
     [SerializeField]
     private InputField createSessionIDField, createSessionPasswordField, joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
-    private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt;
+    private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt,readyTxt,opponentReadyTxt;
 
     public GameServer gameServer;
 
@@ -43,6 +44,14 @@ public class GameClient : MonoBehaviour
     public GameObject afterSelectionBtn;
 
     private string selectedCharacter = null;
+
+    private bool isReady = false;
+
+    private string localClientId=string.Empty;
+
+    private bool localClientReady = false;
+    private bool opponentReady = false;
+
     private void Awake()
     {
        
@@ -51,6 +60,8 @@ public class GameClient : MonoBehaviour
     void Start()
     {
         afterSelectionBtn.SetActive(false);
+        opponentReadyTxt.gameObject.SetActive(false);
+        opponentReadyTxt.text = string.Empty;
     }
     private void Update()
     {
@@ -139,14 +150,14 @@ public class GameClient : MonoBehaviour
     {
         Debug.Log("Server Broadcast: " + message);
 
-        /*if (message == "ShowStartGameButton")
+        if (message.StartsWith("SetClientId:"))
         {
-            UnityMainThreadDispatcher.RunOnMainThread(() =>
-            {
-                // Code to show the "Start Game" button
-                startGameButton.gameObject.SetActive(true);
-            });
-        }*/
+            string[] splitMessage= message.Split(':');
+            localClientId = message.Substring("SetClientId:".Length);
+            Debug.Log($"Client ID set: {localClientId}");
+            return; // Exit the method to avoid processing the rest of the function
+        }
+
 
 
         if (message.StartsWith("ProcessCharacterSelectionRequest:"))//Non-host client
@@ -226,6 +237,24 @@ public class GameClient : MonoBehaviour
                 Debug.Log($"Joined room with ID: {roomID}");
             }
         }
+        if (message.StartsWith("CharacterReadyUpdate:"))
+        {
+            string[] splitMessage = message.Split(':');
+            if (splitMessage.Length >= 5)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                string readinessFlag = splitMessage[3];
+                string clientIdentifier = splitMessage[4];
+                //bool isForLocalClient = (IsHost() && readinessFlag == "Host") || (!IsHost() && readinessFlag == "Member");
+                // Ensure the update is for the opponent and not the local client
+                UpdateOpponentReadinessInfo(characterName, readinessFlag, clientIdentifier);
+
+            }
+
+           
+        }
+
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
@@ -245,8 +274,29 @@ public class GameClient : MonoBehaviour
         }
 
     }
+    
+    // Update the readiness UI for the local client
+    private void UpdateLocalClientReadinessUI(string characterName, string readinessFlag)
+    {
+        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        {
+            opponentReadyTxt.text = string.Empty;
+            readyTxt.color = readinessFlag == "Ready" ? Color.green : Color.red;
+        });
+    }
 
-   
+    // Update the readiness UI for the opponent client
+    private void UpdateOpponentReadinessInfo(string characterName, string readinessFlag, string clientIdentifier)
+    {
+
+        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        {
+            bool isOpponentReady = readinessFlag == "Ready";
+            opponentReadyTxt.gameObject.SetActive(isOpponentReady);
+            opponentReadyTxt.text = clientIdentifier != localClientId ? $"Opponent is ready with character {characterName}" : string.Empty;
+        });
+    }
+
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -356,6 +406,42 @@ public class GameClient : MonoBehaviour
             afterSelectionBtn.SetActive(false); // Hide the cancel button
         }
     }
+
+    public void GetReadyForBattle()//TODO:Handle the non-host passing of readiness messages
+    {
+        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        {
+             // This will clear the text on the main thread
+            
+            if (!isReady)
+            {
+                isReady = true;
+                if (!string.IsNullOrEmpty(selectedCharacter))
+                {
+                    string msg = $"CharacterIsReady:{roomID}:{selectedCharacter}";
+                    SendMessageToServer(msg);
+                    Debug.Log($"Attempting to send character ready message: {msg}");
+                    readyTxt.color = Color.green;
+                    // Other UI updates related to readiness can be added here
+                }
+            }
+            else
+            {
+                isReady = false;
+                if (!string.IsNullOrEmpty(selectedCharacter))
+                {
+                    string msg = $"CharacterCancelReadiness:{roomID}:{selectedCharacter}";
+                    SendMessageToServer(msg);
+                    Debug.Log($"Attempting to send cancel readiness message: {msg}");
+                    readyTxt.color = Color.red;
+                    // Other UI updates related to canceling readiness can be added here
+                }
+            }
+           
+        });
+    }
+
+   
    
     private void UpdateCharacterSelectionUI(string characterName, bool isSelected)
     {

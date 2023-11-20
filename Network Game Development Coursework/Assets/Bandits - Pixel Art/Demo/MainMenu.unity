@@ -2754,6 +2754,7 @@ MonoBehaviour:
   - LightBandit
   createSessionIDField: {fileID: 15853999}
   createSessionPasswordField: {fileID: 341172182}
+  opponentReadyTxt: {fileID: 1048473148}
 --- !u!1 &821012153
 GameObject:
   m_ObjectHideFlags: 0
@@ -3124,6 +3125,86 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 990074662}
   m_CullTransparentMesh: 1
+--- !u!1 &1048473146
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1048473147}
+  - component: {fileID: 1048473149}
+  - component: {fileID: 1048473148}
+  m_Layer: 5
+  m_Name: Opponent Ready Txt
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1048473147
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1048473146}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2080754382}
+  m_RootOrder: 9
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 8.7637, y: 103.78}
+  m_SizeDelta: {x: 617.06, y: 79.765}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1048473148
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1048473146}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f7201a12d95ffc409449d95f23cf332, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Material: {fileID: 0}
+  m_Color: {r: 0, g: 0.9004741, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_FontData:
+    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_FontSize: 33
+    m_FontStyle: 1
+    m_BestFit: 0
+    m_MinSize: 3
+    m_MaxSize: 40
+    m_Alignment: 4
+    m_AlignByGeometry: 0
+    m_RichText: 1
+    m_HorizontalOverflow: 0
+    m_VerticalOverflow: 0
+    m_LineSpacing: 1
+  m_Text: 
+--- !u!222 &1048473149
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1048473146}
+  m_CullTransparentMesh: 1
 --- !u!1 &1063353870
 GameObject:
   m_ObjectHideFlags: 0
@@ -3341,7 +3422,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1067330301}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1361306641}
+        m_TargetAssemblyTypeName: GameClient, Assembly-CSharp
+        m_MethodName: GetReadyForBattle
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1067330301
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4483,6 +4576,8 @@ MonoBehaviour:
   gameNameTxt: {fileID: 79643406}
   createRoomTxt: {fileID: 561287252}
   joinRoomTxt: {fileID: 515213144}
+  readyTxt: {fileID: 1348622487}
+  opponentReadyTxt: {fileID: 1048473148}
   gameServer: {fileID: 820821409}
   heavyBanditBtn: {fileID: 1063353872}
   lightBanditBtn: {fileID: 1739481433}
@@ -5320,12 +5415,12 @@ GameObject:
   m_Component:
   - component: {fileID: 1633309711}
   m_Layer: 5
-  m_Name: AfterSelectionBTN
+  m_Name: AfterSelectionUI
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1633309711
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5341,7 +5436,7 @@ RectTransform:
   - {fileID: 1067330299}
   - {fileID: 821012154}
   m_Father: {fileID: 2080754382}
-  m_RootOrder: 9
+  m_RootOrder: 10
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
@@ -6262,6 +6357,7 @@ RectTransform:
   - {fileID: 1324387314}
   - {fileID: 337101679}
   - {fileID: 1803574237}
+  - {fileID: 1048473147}
   - {fileID: 1633309711}
   m_Father: {fileID: 0}
   m_RootOrder: 8
