@@ -30,7 +30,7 @@ public class GameClient : MonoBehaviour
     [SerializeField]
     private InputField createSessionIDField, createSessionPasswordField, joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
-    private UnityEngine.UI.Text gameNameTxt,createRoomTxt,joinRoomTxt,readyTxt,opponentReadyTxt;
+    private UnityEngine.UI.Text gameNameTxt, createRoomTxt, joinRoomTxt, readyTxt;/*opponentReadyTxt*/
 
     public GameServer gameServer;
 
@@ -51,6 +51,7 @@ public class GameClient : MonoBehaviour
 
     private bool isLocalUpdate=false;
 
+   
     private void Awake()
     {
        
@@ -59,8 +60,8 @@ public class GameClient : MonoBehaviour
     void Start()
     {
         afterSelectionBtn.SetActive(false);
-        opponentReadyTxt.gameObject.SetActive(false);
-        opponentReadyTxt.text = string.Empty;
+        //opponentReadyTxt.gameObject.SetActive(false);
+        //opponentReadyTxt.text = string.Empty;
     }
     private void Update()
     {
@@ -253,6 +254,7 @@ public class GameClient : MonoBehaviour
                 string memberIdentityFlag= splitMessage[4];
                 string clientIdentifier = splitMessage[5];                        
                 UpdateHostReadinessInfo(characterName, readinessFlag,clientIdentifier);
+                Debug.Log($"Host client is ready!");
              
             }
           
@@ -269,8 +271,38 @@ public class GameClient : MonoBehaviour
                 string memberIdentityFlag = splitMessage[4];
                 string clientIdentifier = splitMessage[5];
                 UpdateNonHostReadinessInfo(characterName, readinessFlag, clientIdentifier);
+                Debug.Log($"Non-host client is ready!");
             }
         }
+
+        //Handle the start-game messages
+        /* if (message.StartsWith("HostStartGame:"))
+        {
+            string[] splitMessage=message.Split(":");
+            if (splitMessage.Length >= 3)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Debug.Log("I will start the game by clicking on the start-game button!");
+            }
+
+
+        }else if (message.StartsWith("NonHostStartGame:"))
+        {
+            string[] splitMessage = message.Split(":");
+            if (splitMessage.Length >= 3)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Debug.Log("Waiting for the host to start the game!");
+            }
+        }*/
+        if (message.StartsWith("StartGame:"))
+        {
+            Debug.Log("The host is now ready to start the game!");
+        }
+
+
 
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
@@ -297,7 +329,7 @@ public class GameClient : MonoBehaviour
     {
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
-            opponentReadyTxt.text = string.Empty;
+            //opponentReadyTxt.text = string.Empty;
             readyTxt.color = readinessFlag == "Ready" ? Color.green : Color.red;
         });
     }
@@ -309,8 +341,8 @@ public class GameClient : MonoBehaviour
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
             bool isOpponentReady = readinessFlag == "Ready";
-            opponentReadyTxt.gameObject.SetActive(isOpponentReady);
-            opponentReadyTxt.text = clientIdentifier != localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
+            //opponentReadyTxt.gameObject.SetActive(isOpponentReady);
+            //opponentReadyTxt.text = clientIdentifier != localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
             Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
 
 
@@ -322,8 +354,8 @@ public class GameClient : MonoBehaviour
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
             bool isOpponentReady = readinessFlag == "Ready";
-            opponentReadyTxt.gameObject.SetActive(isOpponentReady);
-            opponentReadyTxt.text = clientIdentifier == localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
+            //opponentReadyTxt.gameObject.SetActive(isOpponentReady);
+            //opponentReadyTxt.text = clientIdentifier == localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
             Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
 
         });
@@ -443,7 +475,7 @@ public class GameClient : MonoBehaviour
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
             // This will clear the text on the main thread
-           opponentReadyTxt.text = string.Empty;
+           //opponentReadyTxt.text = string.Empty;
             if (!isReady)
             {
                 isReady = true;

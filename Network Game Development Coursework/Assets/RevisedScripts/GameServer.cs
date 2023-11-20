@@ -23,6 +23,8 @@ public class GameSession
     public List<Socket> MemberSockets { get; set; } = new List<Socket>();
 
     public Dictionary<Socket, string> PlayerCharacters { get; set; } = new Dictionary<Socket, string>();
+
+    public int NumberOfReadyClients = 0;
 }
 
 
@@ -55,6 +57,8 @@ public class GameServer : MonoBehaviour
     private bool isProcessingCharacterSelection = false;
     [SerializeField] private Text opponentReadyTxt;
     [SerializeField] private Button gameStartBtn;
+    GameSession currentGameSession= null;
+    
     private void Awake()
     {
         
@@ -71,10 +75,11 @@ public class GameServer : MonoBehaviour
         createSessionIDField.gameObject.SetActive(false);
         createSessionIDField.gameObject.SetActive(false);
         createSessionPasswordField.gameObject.SetActive(false);
-
-
+        startGameBtn.gameObject.SetActive(false);
     }
 
+   
+   
     private void OnStartGameClicked()
     {
         Debug.Log("Get ready to start game!");
@@ -584,8 +589,9 @@ public class GameServer : MonoBehaviour
         
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-
-           
+            currentGameSession=session;
+            session.NumberOfReadyClients++;
+            Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
             if (IsHost(current, roomID))
             {
                 string readinessFlag = isReady ? "Ready" : "NotReady";
@@ -597,6 +603,14 @@ public class GameServer : MonoBehaviour
                 Debug.Log($"Current client identifier is {clientIdentifier}.");
                 Debug.Log($"Character readiness update: {message}");
                 BroadcastMessageToSession(session, message);
+            }
+
+            if (session.NumberOfReadyClients == 2)
+            {
+                Debug.Log("Loading game scene & assign character selection logics!");
+                BroadcastStartGame(session);
+                startGameBtn.gameObject.SetActive(true);
+
             }
            
         }
@@ -611,7 +625,10 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
+            currentGameSession = session;
             Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
+            session.NumberOfReadyClients++;
+            Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
             if (!IsHost(current, roomID))
             {
                 string readinessFlag = isReady ? "Ready" : "NotReady";
@@ -625,9 +642,32 @@ public class GameServer : MonoBehaviour
                 Debug.Log($"Character readiness update: {msg}");
                 BroadcastMessageToSession(session, msg);
             }
+
+            if (session.NumberOfReadyClients == 2)
+            {
+                Debug.Log("Loading game scene & assign character selection logics!");
+                BroadcastStartGame(session);
+               
+
+            }
         }
     }
-    
+
+    private void BroadcastStartGame(GameSession session)
+    {
+        string message = "StartGame:"; // You can customize this message
+        foreach (var client in session.MemberSockets)
+        {
+            SendMessage(client, message);
+        }
+        // Also send to host if not included in MemberSockets
+        if (!session.MemberSockets.Contains(session.HostSocket))
+        {
+            SendMessage(session.HostSocket, message);
+        }
+        Debug.Log("Start game message broadcasted to all clients in the session. The host side should have a button displayed for starting the game!");
+    }
+
     private string GetClientIdentifier(Socket clientSocket)
     {
         string[] msgSplit = clientSocket.RemoteEndPoint.ToString().Split(":");
@@ -814,6 +854,7 @@ public class GameServer : MonoBehaviour
     }
 
     
+
 
     private void BroadcastCharacterSelectionCancellation(GameSession session, string message)
     {
