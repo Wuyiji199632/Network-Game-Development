@@ -37,7 +37,7 @@ public class GameClient : MonoBehaviour
 
     public Button heavyBanditBtn, lightBanditBtn;
 
-    public Canvas canvas1, canvas2;
+    public Canvas canvas1, canvas2,inGameCanvas;
     
 
     private Dictionary<Socket, List<byte>> clientMessageBuffers = new Dictionary<Socket, List<byte>>();//Ensure dynamic change for buffer sizes
@@ -288,6 +288,9 @@ public class GameClient : MonoBehaviour
             if (splitMessage.Length >= 3)
             {
                 Debug.Log("Loading game scene and assigning characters!");
+                canvas1.gameObject.SetActive(false);
+                canvas2.gameObject.SetActive(false);
+                inGameCanvas.gameObject.SetActive(true);
             }
         }
 

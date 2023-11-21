@@ -4996,6 +4996,7 @@ MonoBehaviour:
   lightBanditBtn: {fileID: 1739481433}
   canvas1: {fileID: 1998710370}
   canvas2: {fileID: 2080754381}
+  inGameCanvas: {fileID: 1643497227}
   afterSelectionBtn: {fileID: 1633309710}
 --- !u!4 &1361306642
 Transform:
