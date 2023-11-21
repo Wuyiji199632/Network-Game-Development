@@ -30,8 +30,9 @@ public class GameClient : MonoBehaviour
     [SerializeField]
     private InputField createSessionIDField, createSessionPasswordField, joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
-    private UnityEngine.UI.Text gameNameTxt, createRoomTxt, joinRoomTxt, readyTxt;/*opponentReadyTxt*/
-
+    private UnityEngine.UI.Text gameNameTxt, createRoomTxt, joinRoomTxt, readyTxt,waitForTxt;
+    [SerializeField]
+    private Button gameStartBtn;
     public GameServer gameServer;
 
     public Button heavyBanditBtn, lightBanditBtn;
@@ -49,9 +50,9 @@ public class GameClient : MonoBehaviour
 
     private string localClientId=string.Empty;
 
-    private bool isLocalUpdate=false;
+    private bool isHost=false;
 
-   
+    private bool hostIsReady=false, nonHostIsReady=false;
     private void Awake()
     {
        
@@ -60,6 +61,7 @@ public class GameClient : MonoBehaviour
     void Start()
     {
         afterSelectionBtn.SetActive(false);
+        waitForTxt.gameObject.SetActive(true);
         //opponentReadyTxt.gameObject.SetActive(false);
         //opponentReadyTxt.text = string.Empty;
     }
@@ -155,12 +157,14 @@ public class GameClient : MonoBehaviour
             string[] splitMessage= message.Split(':');
             localClientId = message.Substring("SetHostClientId:".Length);
             Debug.Log($"Host Client ID set: {localClientId}");
+            isHost = true;
             return; // Exit the method to avoid processing the rest of the function
         }else if (message.StartsWith("SetNonHostClientId"))
         {
             string[] splitMessage = message.Split(':');
             localClientId = message.Substring("SetNonHostClientId:".Length);
             Debug.Log($"Non Host Client ID set: {localClientId}");
+            isHost = false;
             return; // Exit the method to avoid processing the rest of the function
         }
 
@@ -254,6 +258,7 @@ public class GameClient : MonoBehaviour
                 string memberIdentityFlag= splitMessage[4];
                 string clientIdentifier = splitMessage[5];                        
                 UpdateHostReadinessInfo(characterName, readinessFlag,clientIdentifier);
+               
                 Debug.Log($"Host client is ready!");
              
             }
@@ -271,38 +276,22 @@ public class GameClient : MonoBehaviour
                 string memberIdentityFlag = splitMessage[4];
                 string clientIdentifier = splitMessage[5];
                 UpdateNonHostReadinessInfo(characterName, readinessFlag, clientIdentifier);
+               
                 Debug.Log($"Non-host client is ready!");
             }
         }
 
-        //Handle the start-game messages
-        /* if (message.StartsWith("HostStartGame:"))
+        if (message.StartsWith("GameHasStarted:"))
         {
-            string[] splitMessage=message.Split(":");
+            string[] splitMessage = message.Split(':');
+
             if (splitMessage.Length >= 3)
             {
-                string roomID = splitMessage[1];
-                string characterName = splitMessage[2];
-                Debug.Log("I will start the game by clicking on the start-game button!");
+                Debug.Log("Loading game scene and assigning characters!");
             }
-
-
-        }else if (message.StartsWith("NonHostStartGame:"))
-        {
-            string[] splitMessage = message.Split(":");
-            if (splitMessage.Length >= 3)
-            {
-                string roomID = splitMessage[1];
-                string characterName = splitMessage[2];
-                Debug.Log("Waiting for the host to start the game!");
-            }
-        }*/
-        if (message.StartsWith("StartGame:"))
-        {
-            Debug.Log("The host is now ready to start the game!");
         }
 
-
+       
 
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
@@ -325,24 +314,20 @@ public class GameClient : MonoBehaviour
     }
     
     // Update the readiness UI for the local client
-    private void UpdateLocalClientReadinessUI(string characterName, string readinessFlag)
-    {
-        UnityMainThreadDispatcher.Instance.Enqueue(() =>
-        {
-            //opponentReadyTxt.text = string.Empty;
-            readyTxt.color = readinessFlag == "Ready" ? Color.green : Color.red;
-        });
-    }
-
+   
     // Update the readiness UI for the opponent client
     private void UpdateHostReadinessInfo(string characterName, string readinessFlag,string clientIdentifier)
     {
-        
+        if (!isHost) return;
+        bool isOpponentReady = readinessFlag == "Ready";
+        hostIsReady = isOpponentReady;
+       
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
-            bool isOpponentReady = readinessFlag == "Ready";
-            //opponentReadyTxt.gameObject.SetActive(isOpponentReady);
-            //opponentReadyTxt.text = clientIdentifier != localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
+            
+            gameStartBtn.gameObject.SetActive(isOpponentReady);
+            //waitForHostTxt.gameObject.SetActive(isOpponentReady);
+            waitForTxt.text = $"You are the host!";
             Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
 
 
@@ -350,15 +335,21 @@ public class GameClient : MonoBehaviour
     }
     private void UpdateNonHostReadinessInfo(string characterName, string readinessFlag, string clientIdentifier)
     {
-       
-        UnityMainThreadDispatcher.Instance.Enqueue(() =>
+        if (!isHost)
         {
             bool isOpponentReady = readinessFlag == "Ready";
-            //opponentReadyTxt.gameObject.SetActive(isOpponentReady);
-            //opponentReadyTxt.text = clientIdentifier == localClientId ? $"Your opponent is ready with {characterName}" : string.Empty;
-            Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
+            nonHostIsReady = isOpponentReady;
+            UnityMainThreadDispatcher.Instance.Enqueue(() =>
+            {
+               
+                waitForTxt.gameObject.SetActive(isOpponentReady);             
+                waitForTxt.text = $"Wating for the host to start...";
+                Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
 
-        });
+            });
+        }
+       
+
     }
     private void HandleClientDisconnection(string clientInfo)
     {
@@ -474,8 +465,7 @@ public class GameClient : MonoBehaviour
     {
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
-            // This will clear the text on the main thread
-           //opponentReadyTxt.text = string.Empty;
+            gameStartBtn.gameObject.SetActive(false);
             if (!isReady)
             {
                 isReady = true;
@@ -550,6 +540,41 @@ public class GameClient : MonoBehaviour
     }
 
     #endregion
+
+
+
+    #region Start & In-game logics
+
+    public void StartGameAndPrepareCharacters()
+    {
+        Debug.Log("Game started!");
+
+        if(nonHostIsReady)
+        {
+            if (!string.IsNullOrEmpty(selectedCharacter))
+            {
+                string startGameMsg = $"HostStartGame:{roomID}:{selectedCharacter}";
+                SendMessageToServer(startGameMsg);
+                Debug.Log($"Attampting to send start game message {startGameMsg}");
+            }
+        }
+
+        else
+        {
+            Debug.Log($"Non host client isn't ready yet, failed to start!");
+            waitForTxt.text = $"Please wait for another player to get ready!";
+            waitForTxt.gameObject.SetActive(true);
+        }
+       
+
+
+    }
+
+    #endregion
+
+
+
+
 
     public void GoToRoomCreationPage()
     {

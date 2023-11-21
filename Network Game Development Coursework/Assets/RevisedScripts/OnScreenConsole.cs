@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
+/*Cite: The writing of this class is referenced from chatGPT as I would like to implement a on-screen debug window for unity editor initially for debugging purposes*/
 public class OnScreenConsole : MonoBehaviour
 {
     public Text consoleText;

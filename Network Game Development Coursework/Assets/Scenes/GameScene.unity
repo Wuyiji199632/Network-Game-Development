@@ -250,7 +250,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!4 &420672723
@@ -460,7 +460,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &1135784315
@@ -556,7 +556,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!4 &1135784318
@@ -603,6 +603,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 647acdff9b93256409bb06e60e524b62, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isClient: 1
+  selectHeavyBanditBtn: {fileID: 0}
+  selectLightBanditBtn: {fileID: 0}
+  confirmBtn: {fileID: 0}
+  selectedBanditType: 
+  createSessionIDInputField: {fileID: 0}
+  createPasswordInputField: {fileID: 0}
+  joinSessionIDInputField: {fileID: 0}
+  joinPasswordInputField: {fileID: 0}
 --- !u!4 &1555101068
 Transform:
   m_ObjectHideFlags: 0
@@ -685,7 +694,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!4 &1599094739
@@ -744,7 +753,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6732647917304232145, guid: 0473c3c1289d310488e39414f748a52f, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6732647917304232147, guid: 0473c3c1289d310488e39414f748a52f, type: 3}
       propertyPath: m_RootOrder

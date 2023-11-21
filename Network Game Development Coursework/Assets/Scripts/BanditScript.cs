@@ -33,13 +33,14 @@ public class BanditScript : MonoBehaviour
         BanditMovement();
 
         // Handle Jumping
-        if (Input.GetButtonDown("Jump") && !isJumping)
+        if (Input.GetButtonDown("Jump")&&!isJumping)
         {
             Jump();
         }
 
         // Ground check
         isJumping = !Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
+        Debug.Log("Is Jumping?" + isJumping);
 
         if (Input.GetButtonDown("Fire1"))
         {
