@@ -56,7 +56,11 @@ public class GameClient : MonoBehaviour
 
     public GameObject lightBandit, heavyBandit;
 
-    public Transform hostSpawnPoint, nonHostSpawnPoint;
+    public Transform spawnPoint;
+
+    private bool instantiateNonhostCharForHost = false, instantiateHostForNonhost = false;
+
+    private string g_selectedHostCharacter=string.Empty,g_selectedNonHostCharacter=string.Empty; // Store the global host and non-host characters
     private void Awake()
     {
        
@@ -303,36 +307,54 @@ public class GameClient : MonoBehaviour
                
         }
 
-        if (message.StartsWith("InstantiateCharacterForHost"))
+        if (message.StartsWith("CharacterSelectionsForHost:"))
         {
-            string[] splitMessage = message.Split(':');
+            string[] splitMessage = message.Split(":");
 
-            if (splitMessage.Length >= 3)
+            if (splitMessage.Length >= 2)
             {
-                string roomID = splitMessage[1];
-                string characterName = splitMessage[2];
-                Vector3 spawnPos=hostSpawnPoint.position;
+                string hostCharacter = splitMessage[1];                
+                g_selectedHostCharacter = hostCharacter;
+                Debug.Log($"The selected host character is {hostCharacter}");
+                instantiateNonhostCharForHost = true;
+                Vector3 spawnPos = spawnPoint.position;
                 spawnPos.z = 0;
-                switch (selectedCharacter)
-                {
-                    case "LightBandit": Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                        break;
-                    case "HeavyBandit": Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                        break;
-                }
+                Debug.Log($"Host is {hostCharacter}. Can I instantiate non-host for host? {instantiateNonhostCharForHost}");
+
                
 
             }
-        }else if (message.StartsWith("InstantiateCharacterForNonHost"))
+        }
+        else if (message.StartsWith("CharacterSelectionsForNonHost:"))
         {
+            string[] splitMessage = message.Split(":");
+
+            if (splitMessage.Length >= 2)
+            {
+               
+                string nonHostCharacter = splitMessage[1];
+                g_selectedNonHostCharacter = nonHostCharacter;
+                Debug.Log($"The selected non-host character is {nonHostCharacter}");
+                instantiateHostForNonhost = true;
+                Vector3 spawnPos = spawnPoint.position;
+                spawnPos.z = 0;
+                Debug.Log($"Non-host is {nonHostCharacter}.Can I instantiate host for non-host? {instantiateHostForNonhost}");
+              
+            }
+        }
+
+        if (message.StartsWith("InstantiateCharacterForHost:"))
+        {
+            
             string[] splitMessage = message.Split(':');
 
-            if (splitMessage.Length >= 3)
+            if (splitMessage.Length >= 2)
             {
                 string roomID = splitMessage[1];
                 string characterName = splitMessage[2];
-                Vector3 spawnPos = nonHostSpawnPoint.position;
+                Vector3 spawnPos= spawnPoint.position;
                 spawnPos.z = 0;
+                Debug.Log($"Instantiate character for host");
                 switch (selectedCharacter)
                 {
                     case "LightBandit":
@@ -342,11 +364,58 @@ public class GameClient : MonoBehaviour
                         Instantiate(heavyBandit, spawnPos, Quaternion.identity);
                         break;
                 }
+                switch (g_selectedNonHostCharacter)
+                {
+                    case "LightBandit":
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+
+
+
             }
         }
-        
-       
+        else if (message.StartsWith("InstantiateCharacterForNonHost:"))
+        {
+           
+            string[] splitMessage = message.Split(':');
 
+            if (splitMessage.Length >= 3)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Vector3 spawnPos = spawnPoint.position;
+                spawnPos.z = 0;
+                Debug.Log($"Instantiate character for non host!");
+                switch (selectedCharacter)
+                {
+                    case "LightBandit":
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+                switch (g_selectedHostCharacter)
+                {
+                    case "LightBandit":
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+
+
+
+
+            }
+        }
+
+       
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {

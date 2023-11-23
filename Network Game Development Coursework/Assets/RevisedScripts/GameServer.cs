@@ -24,6 +24,8 @@ public class GameSession
 
     public Dictionary<Socket, string> PlayerCharacters { get; set; } = new Dictionary<Socket, string>();
 
+    public Dictionary<Socket, string> SelectedCharacters { get; set; } = new Dictionary<Socket, string>();
+
     public int NumberOfReadyClients = 0;
 }
 
@@ -440,7 +442,7 @@ public class GameServer : MonoBehaviour
                     string characterName = splitData[2];
 
                     //ProcessCharacterSelectionRequest(current, roomID, characterName, requestingClientEndpoint);
-                    ForwardSelectionRequestToHost(current, roomID, characterName);
+                    SynchroniseHostNonhostSelection(current, roomID, characterName);
                 }
               
                 break;
@@ -512,15 +514,7 @@ public class GameServer : MonoBehaviour
                     string roomID = splitData[1];
                     string characterName = splitData[2];
 
-                    if (IsHost(current, roomID))
-                    {
-
-                        InstantiateCharacterForHost(current, roomID, characterName);
-                    }
-                    else
-                    {
-                        InstantiateCharacterForNonHost(current, roomID, characterName);
-                    }
+                    InstantiateCharacter(current, roomID, characterName);
                 }
                 break;
                     default:
@@ -571,7 +565,7 @@ public class GameServer : MonoBehaviour
                     if (!session.PlayerCharacters.Values.Contains(characterName))
                     {
                         session.PlayerCharacters[current] = characterName;
-
+                       
                         BroadcastCharacterSelection_Host(session, current, characterName);
 
                         Debug.Log($"Character {characterName} selected for client {current.RemoteEndPoint}");
@@ -580,14 +574,10 @@ public class GameServer : MonoBehaviour
 
                         string message = $"CharacterSelectionUpdate:{roomID}:{characterName}";
                         BroadcastMessageToSession(session, message);
+                       
 
+                       
 
-
-                        // Check if all players have selected characters; if so, broadcast start game button
-                        if (session.PlayerCharacters.Count == session.MemberSockets.Count)
-                        {
-                            BroadcastStartGameButton(session);
-                        }
                     }
                     else
                     {
@@ -615,6 +605,31 @@ public class GameServer : MonoBehaviour
         }
 
     }
+    private void NotifyHostClientsOfCharacterSelections(GameSession session)
+    {
+        string hostCharacter = session.PlayerCharacters[session.HostSocket];
+            
+        foreach (var clientSocket in session.MemberSockets)
+        {
+            Debug.Log($"Attempting to notify host character selection for all clients in the session!");
+            string message = $"CharacterSelectionsForHost:{hostCharacter}";
+            //SendMessage(clientSocket, message);
+            BroadcastMessageToSession(session, message);
+        }
+
+        
+    }
+    private void NotifyNonHostClientsOfCharacterSelections(GameSession session)
+    {
+        string nonHostCharacter = session.PlayerCharacters[session.NonHostSocket];
+        foreach (var clientSocket in session.MemberSockets)
+        {
+            Debug.Log($"Attempting to notify non-host character selection for all clients in the session!");
+            string message = $"CharacterSelectionsForNonHost:{nonHostCharacter}";
+            //SendMessage(clientSocket, message);
+            BroadcastMessageToSession(session, message);
+        }
+    }
     private void SetHostCharacterReady(Socket current, string roomID, string characterName, bool isReady)
     {
         
@@ -635,12 +650,11 @@ public class GameServer : MonoBehaviour
                 Debug.Log($"Current client identifier is {clientIdentifier}.");
                 Debug.Log($"Character readiness update: {message}");
                 BroadcastMessageToSession(session, message);
-               
-               
+
+                NotifyHostClientsOfCharacterSelections(session);
+
             }
-
            
-
         }
         else
         {
@@ -669,9 +683,13 @@ public class GameServer : MonoBehaviour
                 Debug.Log($"Current client identifier is {clientIdentifier}.");
                 Debug.Log($"Character readiness update: {msg}");
                 BroadcastMessageToSession(session, msg);
+
+                NotifyNonHostClientsOfCharacterSelections(session);
                         
             }
             
+
+
         }
     }
    
@@ -763,7 +781,7 @@ public class GameServer : MonoBehaviour
             SendMessage(client, message);
         }
     }
-    private void ForwardSelectionRequestToHost(Socket current, string roomID, string characterName)
+    private void SynchroniseHostNonhostSelection(Socket current, string roomID, string characterName)
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
@@ -775,12 +793,15 @@ public class GameServer : MonoBehaviour
                 SendMessage(session.HostSocket, message);
                 Debug.Log("Forwarding message to host!");
                 session.PlayerCharacters[current] = characterName;
+               
             }
             else
             {
                 Debug.Log("Current client is the host, processing directly.");
                 QueueCharacterSelection(current, roomID, characterName);
             }
+
+            
         }
         else
         {
@@ -807,6 +828,7 @@ public class GameServer : MonoBehaviour
             SendMessage(session.HostSocket, message);
         }
 
+        
         Debug.Log("BroadcastCharacterSelection finished for host.");
     }
     
@@ -1004,7 +1026,7 @@ public class GameServer : MonoBehaviour
     }
     public bool IsHost(Socket current, string roomID)
     {
-        return activeSessions.TryGetValue(roomID, out var session) && session.HostSocket == current;
+        return activeSessions.TryGetValue(roomID, out var session) && current==session.HostSocket;
     }
     #endregion
 
@@ -1017,42 +1039,30 @@ public class GameServer : MonoBehaviour
 
             string startGameMsg = $"GameHasStarted:{roomID}:{characterName}";
 
-            SendMessage(current, startGameMsg);
+            //SendMessage(current, startGameMsg);
             BroadcastMessageToSession(session, startGameMsg);
         }
             
     }
 
 
-    private void InstantiateCharacterForHost(Socket current, string roomID, string characterName)
+    private void InstantiateCharacter(Socket current, string roomID, string characterName)
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
+            //NotifyHostClientsOfCharacterSelections(session);
             Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
-
             string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
-
-            SendMessage(current , instantiationMsgForHost);
-            BroadcastMessageToSession(session , instantiationMsgForHost);
-
-
-        }
-    }
-    private void InstantiateCharacterForNonHost(Socket current, string roomID, string characterName)
-    {
-        if (activeSessions.TryGetValue(roomID, out GameSession session))
-        {
-            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
-
-            string instantiationMsgForHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
-
-            SendMessage(current, instantiationMsgForHost);
             BroadcastMessageToSession(session, instantiationMsgForHost);
 
+            //NotifyNonHostClientsOfCharacterSelections(session);
+            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+            string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+            BroadcastMessageToSession(session, instantiationMsgForNonHost);
 
         }
     }
-
+    
     #endregion
 
 
