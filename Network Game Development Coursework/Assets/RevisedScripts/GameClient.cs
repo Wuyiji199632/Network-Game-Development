@@ -53,6 +53,10 @@ public class GameClient : MonoBehaviour
     private bool isHost=false;
 
     private bool hostIsReady=false, nonHostIsReady=false;
+
+    public GameObject lightBandit, heavyBandit;
+
+    public Transform hostSpawnPoint, nonHostSpawnPoint;
     private void Awake()
     {
        
@@ -287,13 +291,60 @@ public class GameClient : MonoBehaviour
 
             if (splitMessage.Length >= 3)
             {
-                Debug.Log("Loading game scene and assigning characters!");
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Debug.Log($"Loading game scene and assigning characters in room {roomID}, current selected character is {characterName}");
                 canvas1.gameObject.SetActive(false);
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
+
+                //Instantiate characters based on the type
             }
+               
         }
 
+        if (message.StartsWith("InstantiateCharacterForHost"))
+        {
+            string[] splitMessage = message.Split(':');
+
+            if (splitMessage.Length >= 3)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Vector3 spawnPos=hostSpawnPoint.position;
+                spawnPos.z = 0;
+                switch (selectedCharacter)
+                {
+                    case "LightBandit": Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit": Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+               
+
+            }
+        }else if (message.StartsWith("InstantiateCharacterForNonHost"))
+        {
+            string[] splitMessage = message.Split(':');
+
+            if (splitMessage.Length >= 3)
+            {
+                string roomID = splitMessage[1];
+                string characterName = splitMessage[2];
+                Vector3 spawnPos = nonHostSpawnPoint.position;
+                spawnPos.z = 0;
+                switch (selectedCharacter)
+                {
+                    case "LightBandit":
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+            }
+        }
+        
        
 
         // Add any logics needed when a message is received here
@@ -557,7 +608,9 @@ public class GameClient : MonoBehaviour
             if (!string.IsNullOrEmpty(selectedCharacter))
             {
                 string startGameMsg = $"HostStartGame:{roomID}:{selectedCharacter}";
+                string charPrepMsg = $"CharacterPrep:{roomID}:{selectedCharacter}";
                 SendMessageToServer(startGameMsg);
+                SendMessageToServer(charPrepMsg);
                 Debug.Log($"Attampting to send start game message {startGameMsg}");
             }
         }
@@ -569,15 +622,9 @@ public class GameClient : MonoBehaviour
             waitForTxt.gameObject.SetActive(true);
         }
        
-
-
     }
 
     #endregion
-
-
-
-
 
     public void GoToRoomCreationPage()
     {

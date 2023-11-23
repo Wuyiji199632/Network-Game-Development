@@ -506,6 +506,23 @@ public class GameServer : MonoBehaviour
                     }
                 }
                 break;
+            case "CharacterPrep":
+                if (splitData.Length == 3)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
+
+                    if (IsHost(current, roomID))
+                    {
+
+                        InstantiateCharacterForHost(current, roomID, characterName);
+                    }
+                    else
+                    {
+                        InstantiateCharacterForNonHost(current, roomID, characterName);
+                    }
+                }
+                break;
                     default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
@@ -1006,8 +1023,37 @@ public class GameServer : MonoBehaviour
             
     }
 
-    #endregion
 
+    private void InstantiateCharacterForHost(Socket current, string roomID, string characterName)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
+
+            string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
+
+            SendMessage(current , instantiationMsgForHost);
+            BroadcastMessageToSession(session , instantiationMsgForHost);
+
+
+        }
+    }
+    private void InstantiateCharacterForNonHost(Socket current, string roomID, string characterName)
+    {
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        {
+            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+
+            string instantiationMsgForHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+
+            SendMessage(current, instantiationMsgForHost);
+            BroadcastMessageToSession(session, instantiationMsgForHost);
+
+
+        }
+    }
+
+    #endregion
 
 
     private void CloseAllSockets()
