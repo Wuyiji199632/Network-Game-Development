@@ -13,6 +13,7 @@ using System.Linq;
 using System.Xml.Serialization;
 
 
+
 public class GameSession
 {
     public string RoomID { get; set; } //This is actually the room id for a specific room
@@ -35,7 +36,7 @@ public class GameServer : MonoBehaviour
 
     
     public static GameServer Instance;
-    private Socket serverSocket;
+    private Socket tcpServerSocket,udpServerSocket=null;
     public bool isRunning,joinRoomDecision;
     private List<Socket> clientSockets = new List<Socket>();
     private const int BUFFER_SIZE = 2048;
@@ -85,8 +86,7 @@ public class GameServer : MonoBehaviour
     }
     void Start()
     {
-        udpClientObj.gameObject.SetActive(false);
-        udpServerObj.gameObject.SetActive(false);
+        
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
@@ -106,12 +106,12 @@ public class GameServer : MonoBehaviour
 
     public void StartServer()
     {
-        serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); //Ensure that each socket address can be reused
-        serverSocket.Bind(new IPEndPoint(IPAddress.Any, tcpPort));
-        serverSocket.Listen(10);
+        tcpServerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        tcpServerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); //Ensure that each socket address can be reused
+        tcpServerSocket.Bind(new IPEndPoint(IPAddress.Any, tcpPort));
+        tcpServerSocket.Listen(10);
         isRunning = true;
-        serverSocket.BeginAccept(AcceptCallback, null);
+        tcpServerSocket.BeginAccept(AcceptCallback, null);
 
 
         createSessionIDField.gameObject.SetActive(true);
@@ -132,7 +132,7 @@ public class GameServer : MonoBehaviour
 
         try
         {
-            socket = serverSocket.EndAccept(AR);
+            socket = tcpServerSocket.EndAccept(AR);
         }
         catch (ObjectDisposedException)
         {
@@ -156,7 +156,7 @@ public class GameServer : MonoBehaviour
         Debug.Log(connectMessage);
 
         // Continue listening for new clients
-        serverSocket.BeginAccept(AcceptCallback, null);
+        tcpServerSocket.BeginAccept(AcceptCallback, null);
     }
     private void ProcessReceivedData(Socket current, int received)
     {
@@ -1045,6 +1045,7 @@ public class GameServer : MonoBehaviour
     #region Start Game Logics
     private void StartGameAndLoadAssignGameCharacters(Socket current, string roomID, string characterName)
     {
+        StartUDPServer(); // Start the UDP server
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
             Debug.Log($"The game has started and characters are assigned to the individual player");
@@ -1086,7 +1087,7 @@ public class GameServer : MonoBehaviour
             socket.Close();
         }
 
-        serverSocket.Close();
+        tcpServerSocket.Close();
        
     }
 
@@ -1106,19 +1107,22 @@ public class GameServer : MonoBehaviour
     {
         udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
         udpServer = new UdpClient(udpEndPoint);
+        Debug.Log("UDP Server started on port " + udpPort);
         StartListeningUDP();
     }
 
     private void StartListeningUDP()
     {
         udpServer.BeginReceive(ReceiveUDP, null);
+        Debug.Log("UDP Server listening for messages.");
     }
 
     private void ReceiveUDP(IAsyncResult result)
     {
         byte[] receivedData = udpServer.EndReceive(result, ref udpEndPoint);
+        string message = Encoding.ASCII.GetString(receivedData);
         // Process received data...
-
+        Debug.Log("Received UDP message: " + message);
         // Restart listening for UDP data
         udpServer.BeginReceive(ReceiveUDP, null);
     }

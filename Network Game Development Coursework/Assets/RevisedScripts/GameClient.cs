@@ -311,8 +311,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 canvas1.gameObject.SetActive(false);
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
-                gameServer.udpClientObj.SetActive(true);
-                gameServer.udpServerObj.SetActive(true);
+             
                 //Instantiate characters based on the type
             }
                
@@ -694,8 +693,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     public void StartGameAndPrepareCharacters()
     {
         Debug.Log("Game started!");
-
-        if(nonHostIsReady)
+        StartUDPClient();
+        if (nonHostIsReady)
         {
             if (!string.IsNullOrEmpty(selectedCharacter))
             {
