@@ -60,6 +60,8 @@ public class GameClient : MonoBehaviour
 
     private bool instantiateNonhostCharForHost = false, instantiateHostForNonhost = false;
 
+   
+
     private string g_selectedHostCharacter=string.Empty,g_selectedNonHostCharacter=string.Empty; // Store the global host and non-host characters
     private void Awake()
     {
@@ -213,7 +215,7 @@ public class GameClient : MonoBehaviour
             }
 
         }
-        Debug.Log($"Client Received Message: {message}");
+        
         if (message.StartsWith("CharacterSelectionCancelled:"))
         {
             string[] splitMessage = message.Split(':');
@@ -319,7 +321,7 @@ public class GameClient : MonoBehaviour
                 instantiateNonhostCharForHost = true;
                 Vector3 spawnPos = spawnPoint.position;
                 spawnPos.z = 0;
-                Debug.Log($"Host is {hostCharacter}. Can I instantiate non-host for host? {instantiateNonhostCharForHost}");
+                Debug.Log($"Host is {hostCharacter}");
 
                
 
@@ -338,11 +340,11 @@ public class GameClient : MonoBehaviour
                 instantiateHostForNonhost = true;
                 Vector3 spawnPos = spawnPoint.position;
                 spawnPos.z = 0;
-                Debug.Log($"Non-host is {nonHostCharacter}.Can I instantiate host for non-host? {instantiateHostForNonhost}");
+                Debug.Log($"Non-host is {nonHostCharacter}.");
               
             }
         }
-
+      
         if (message.StartsWith("InstantiateCharacterForHost:"))
         {
             
@@ -350,32 +352,31 @@ public class GameClient : MonoBehaviour
 
             if (splitMessage.Length >= 2)
             {
-                string roomID = splitMessage[1];
-                string characterName = splitMessage[2];
-                Vector3 spawnPos= spawnPoint.position;
-                spawnPos.z = 0;
-                Debug.Log($"Instantiate character for host");
-                switch (selectedCharacter)
+               
+                if (instantiateNonhostCharForHost)
                 {
-                    case "LightBandit":
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                        break;
-                    case "HeavyBandit":
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                        break;
+                    instantiateNonhostCharForHost = false;
+                    string roomID = splitMessage[1];
+                    splitMessage[2] = g_selectedHostCharacter;
+                    string characterName = splitMessage[2];
+                    Vector3 spawnPos = spawnPoint.position;
+                    spawnPos.z = 0;
+                    Debug.Log($"Instantiate character for host.The host character is {characterName}.");
+                  
+                    switch (g_selectedHostCharacter)
+                    {
+                        case "LightBandit":
+                            Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                            break;
+                        case "HeavyBandit":
+                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                            break;
+                            default :break;
+                    }
+                    
+                    
                 }
-                switch (g_selectedNonHostCharacter)
-                {
-                    case "LightBandit":
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                        break;
-                    case "HeavyBandit":
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                        break;
-                }
-
-
-
+              
             }
         }
         else if (message.StartsWith("InstantiateCharacterForNonHost:"))
@@ -385,37 +386,36 @@ public class GameClient : MonoBehaviour
 
             if (splitMessage.Length >= 3)
             {
-                string roomID = splitMessage[1];
-                string characterName = splitMessage[2];
-                Vector3 spawnPos = spawnPoint.position;
-                spawnPos.z = 0;
-                Debug.Log($"Instantiate character for non host!");
-                switch (selectedCharacter)
+               
+
+                if (instantiateHostForNonhost)
                 {
-                    case "LightBandit":
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                        break;
-                    case "HeavyBandit":
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                        break;
+                    instantiateHostForNonhost = false;
+                    string roomID = splitMessage[1];
+                    splitMessage[2] = g_selectedNonHostCharacter;
+                    string characterName = splitMessage[2];
+                    Vector3 spawnPos = spawnPoint.position;
+                    spawnPos.z = 0;
+                    Debug.Log($"Instantiate character for non host! the non-host character is{characterName}");
+                   
+                    switch (g_selectedNonHostCharacter)
+                    {
+                        case "LightBandit":
+                            Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                            break;
+                        case "HeavyBandit":
+                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                            break;
+                    }
+                    
+                   
                 }
-                switch (g_selectedHostCharacter)
-                {
-                    case "LightBandit":
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                        break;
-                    case "HeavyBandit":
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                        break;
-                }
-
-
-
-
+               
             }
         }
 
-       
+
+
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
@@ -474,6 +474,23 @@ public class GameClient : MonoBehaviour
        
 
     }
+    private void InstantiateCharacter(string characterName)
+    {
+        Vector3 spawnPos = spawnPoint.position;
+        spawnPos.z = 0;
+
+        switch (characterName)
+        {
+            case "LightBandit":
+                Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                break;
+            case "HeavyBandit":
+                Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                break;
+                // Handle other characters if necessary
+        }
+    }
+   
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -495,6 +512,7 @@ public class GameClient : MonoBehaviour
             clientSocket.Close();
         }
         ResetCharacterSelectionUI();
+        
 
     }
     #region Session Generation Logics
