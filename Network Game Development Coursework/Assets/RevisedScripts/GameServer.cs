@@ -64,6 +64,8 @@ public class GameServer : MonoBehaviour
 
     public GameObject heavyBanditPrefab, lightBanditPrefab;
 
+    public GameObject udpClientObj;
+
     private void Awake()
     {
         

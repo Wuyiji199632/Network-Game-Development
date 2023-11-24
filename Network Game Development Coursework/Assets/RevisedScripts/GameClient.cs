@@ -12,7 +12,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Linq;
 
 
-public class GameClient : MonoBehaviour
+public class GameClient : MonoBehaviour //This is the class specifying the use of tcp-ip
 {
     public static GameClient Instance;
     private string roomID;

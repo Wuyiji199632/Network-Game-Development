@@ -11,13 +11,13 @@ public class BanditScript : MonoBehaviour
     public LayerMask groundLayer;
     public Transform groundCheckPoint;
     public float checkRadius = 0.5f;
-    public NetworkManager networkManager;
-
-
-
+    public GameServer gameServer;
+    public GameClient gameClient;
+  
     private void Awake()
     {
-        networkManager = FindObjectOfType<NetworkManager>();
+        gameServer=FindObjectOfType<GameServer>();
+        gameClient=FindObjectOfType<GameClient>();
     }
     // Start is called before the first frame update
     void Start()
@@ -98,5 +98,13 @@ public class BanditScript : MonoBehaviour
     void Attack()
     {
         anim.SetTrigger("Attack");
+    }
+
+    private bool IsLocalPlayer()
+    {
+
+
+
+        return false;
     }
 }
