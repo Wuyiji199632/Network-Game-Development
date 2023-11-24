@@ -69,12 +69,14 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private UdpClient udpClient;
     private IPEndPoint udpServerEndPoint;
-
+   
     #endregion
     private void Awake()
     {
        
         DontDestroyOnLoad(this);
+
+       
     }
     void Start()
     {
@@ -92,10 +94,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             gameNameTxt?.gameObject.SetActive(false);
             createRoomTxt?.gameObject.SetActive(true);
-        }
-        
+        }         
     }
-    
+  
     public void ConnectToServer()
     {
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -281,7 +282,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
              
             }
           
-        }else if (message.StartsWith("NonHostCharacterReadyUpdate"))
+        }else if (message.StartsWith("NonHostCharacterReadyUpdate:"))
         {
             string[] splitMessage = message.Split(':');
             if (splitMessage.Length >= 6)
@@ -832,7 +833,11 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         // Restart listening for UDP data
         udpClient.BeginReceive(ReceiveUDP, null);
     }
-
+    public string GetLocalPlayerId()
+    {
+        // Generate a unique identifier for this client
+        return Guid.NewGuid().ToString();
+    }
     #endregion
 }
 

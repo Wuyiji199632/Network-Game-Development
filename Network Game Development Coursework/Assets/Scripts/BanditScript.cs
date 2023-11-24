@@ -13,11 +13,17 @@ public class BanditScript : MonoBehaviour
     public float checkRadius = 0.5f;
     public GameServer gameServer;
     public GameClient gameClient;
-  
+    private string localPlayerId;
+
     private void Awake()
     {
         gameServer=FindObjectOfType<GameServer>();
         gameClient=FindObjectOfType<GameClient>();
+
+        // Initialize localPlayerId
+        localPlayerId = gameClient.GetLocalPlayerId();
+
+        Debug.Log($"Awake - Local Player ID: {localPlayerId}");
     }
     // Start is called before the first frame update
     void Start()
@@ -30,10 +36,11 @@ public class BanditScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        
         BanditMovement();
 
         // Handle Jumping
-        if (Input.GetButtonDown("Jump")&&!isJumping)
+        if (Input.GetButtonDown("Jump") && !isJumping)
         {
             Jump();
         }
@@ -46,6 +53,7 @@ public class BanditScript : MonoBehaviour
         {
             Attack();
         }
+
     }
 
     void BanditMovement()
@@ -85,8 +93,8 @@ public class BanditScript : MonoBehaviour
                 transform.rotation = new Quaternion(0, 0, 0, 0);
             }
         }
-     
-        
+
+        //SendPositionUpdate();
     }
   
     void Jump()
@@ -103,8 +111,20 @@ public class BanditScript : MonoBehaviour
     private bool IsLocalPlayer()
     {
 
-
+        //TODO: identify the local player
 
         return false;
     }
+
+    void SendPositionUpdate()
+    {
+        Vector3 position = transform.position;
+        Quaternion rotation = transform.rotation;
+
+        string message = $"UpdatePosition:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
+
+        gameClient.SendUDPMessage(message);
+    }
+
+    
 }

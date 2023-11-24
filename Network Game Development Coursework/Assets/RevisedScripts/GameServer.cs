@@ -70,13 +70,14 @@ public class GameServer : MonoBehaviour
 
     public GameObject udpClientObj,udpServerObj;
 
-
+    public bool isLocalPlayer = false;
 
     #region UDP variables
 
     private UdpClient udpServer;
     private IPEndPoint udpEndPoint;
-
+    private List<IPEndPoint> udpClientEndpoints = new List<IPEndPoint>();
+    
     #endregion
     private void Awake()
     {
@@ -588,10 +589,7 @@ public class GameServer : MonoBehaviour
 
                         string message = $"CharacterSelectionUpdate:{roomID}:{characterName}";
                         BroadcastMessageToSession(session, message);
-                       
-
-                       
-
+                                            
                     }
                     else
                     {
@@ -649,9 +647,7 @@ public class GameServer : MonoBehaviour
         
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-           
-            
-           
+                               
             Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
             if (IsHost(current, roomID))
             {
@@ -666,7 +662,6 @@ public class GameServer : MonoBehaviour
                 BroadcastMessageToSession(session, message);
 
                 NotifyHostClientsOfCharacterSelections(session);
-
             }
            
         }
@@ -1123,8 +1118,30 @@ public class GameServer : MonoBehaviour
         string message = Encoding.ASCII.GetString(receivedData);
         // Process received data...
         Debug.Log("Received UDP message: " + message);
+
+        if (!udpClientEndpoints.Any(endpoint => endpoint.Equals(udpEndPoint)))
+        {
+            udpClientEndpoints.Add(new IPEndPoint(udpEndPoint.Address, udpEndPoint.Port));
+        }
+
+        // Process the message here
+        if (message.StartsWith("UpdatePosition"))
+        {
+            BroadcastUDPMessage(message); // Broadcast to all clients
+        }
+
         // Restart listening for UDP data
         udpServer.BeginReceive(ReceiveUDP, null);
+    }
+
+    private void BroadcastUDPMessage(string message)
+    {
+        byte[] data = Encoding.UTF8.GetBytes(message);
+
+        foreach (var clientEndPoint in udpClientEndpoints)
+        {
+            udpServer.Send(data, data.Length, clientEndPoint);
+        }
     }
     #endregion
 }
