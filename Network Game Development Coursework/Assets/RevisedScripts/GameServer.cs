@@ -32,6 +32,8 @@ public class GameSession
 
 public class GameServer : MonoBehaviour
 {
+
+    
     public static GameServer Instance;
     private Socket serverSocket;
     public bool isRunning,joinRoomDecision;
@@ -39,8 +41,9 @@ public class GameServer : MonoBehaviour
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
     [SerializeField]
-    private int port = 7777;
-    
+    private int tcpPort = 8888;
+    [SerializeField]
+    private int udpPort = 8889;
     public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
     public Dictionary<string, GameSession> activeSessions=new Dictionary<string, GameSession>();//Dictionary to store the active game sessions
@@ -64,8 +67,16 @@ public class GameServer : MonoBehaviour
 
     public GameObject heavyBanditPrefab, lightBanditPrefab;
 
-    public GameObject udpClientObj;
+    public GameObject udpClientObj,udpServerObj;
 
+
+
+    #region UDP variables
+
+    private UdpClient udpServer;
+    private IPEndPoint udpEndPoint;
+
+    #endregion
     private void Awake()
     {
         
@@ -74,7 +85,8 @@ public class GameServer : MonoBehaviour
     }
     void Start()
     {
-
+        udpClientObj.gameObject.SetActive(false);
+        udpServerObj.gameObject.SetActive(false);
         startGameBtn.gameObject.SetActive(true);
         quitGameBtn.gameObject.SetActive(true);
         createRoomBtn.gameObject.SetActive(false);
@@ -96,7 +108,7 @@ public class GameServer : MonoBehaviour
     {
         serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         serverSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); //Ensure that each socket address can be reused
-        serverSocket.Bind(new IPEndPoint(IPAddress.Any, port));
+        serverSocket.Bind(new IPEndPoint(IPAddress.Any, tcpPort));
         serverSocket.Listen(10);
         isRunning = true;
         serverSocket.BeginAccept(AcceptCallback, null);
@@ -109,7 +121,7 @@ public class GameServer : MonoBehaviour
         createRoomBtn2.gameObject.SetActive(true);
 
 
-        Debug.Log("Server started on port " + port);
+        Debug.Log("Server started on port " + tcpPort);
     }
 
    
@@ -690,8 +702,6 @@ public class GameServer : MonoBehaviour
                         
             }
             
-
-
         }
     }
    
@@ -1091,4 +1101,26 @@ public class GameServer : MonoBehaviour
         Application.Quit();
         
     }
+    #region Set up UDP Server
+    public void StartUDPServer()
+    {
+        udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
+        udpServer = new UdpClient(udpEndPoint);
+        StartListeningUDP();
+    }
+
+    private void StartListeningUDP()
+    {
+        udpServer.BeginReceive(ReceiveUDP, null);
+    }
+
+    private void ReceiveUDP(IAsyncResult result)
+    {
+        byte[] receivedData = udpServer.EndReceive(result, ref udpEndPoint);
+        // Process received data...
+
+        // Restart listening for UDP data
+        udpServer.BeginReceive(ReceiveUDP, null);
+    }
+    #endregion
 }

@@ -23,7 +23,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     [SerializeField]
     private string serverIp = "127.0.0.1"; //Test with a fixed ip address, we will generate an ip address later on for more robust connection or get the ip address the current network is connected to
     [SerializeField]
-    private int serverPort = 7777;
+    private int serverPortTCP = 8888;
+    [SerializeField]
+    private int serverPortUDP = 8889;
     [SerializeField]
     private Button startGameBtn, quitGameBtn, createRoomBtn, joinRoomBtn, createRoomBtn2, joinRoomBtn2, mainMenuBtn;
     private bool receivedDebugMessage = false;
@@ -60,9 +62,15 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private bool instantiateNonhostCharForHost = false, instantiateHostForNonhost = false;
 
-   
-
     private string g_selectedHostCharacter=string.Empty,g_selectedNonHostCharacter=string.Empty; // Store the global host and non-host characters
+
+
+    #region UDP variables
+
+    private UdpClient udpClient;
+    private IPEndPoint udpServerEndPoint;
+
+    #endregion
     private void Awake()
     {
        
@@ -93,7 +101,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         try
         {
-            clientSocket.BeginConnect(serverIp, serverPort, ConnectCallback, clientSocket);
+            clientSocket.BeginConnect(serverIp, serverPortTCP, ConnectCallback, clientSocket);
             //SceneManager.LoadScene("RoomCreationPage");
            
         }
@@ -303,7 +311,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 canvas1.gameObject.SetActive(false);
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
-
+                gameServer.udpClientObj.SetActive(true);
+                gameServer.udpServerObj.SetActive(true);
                 //Instantiate characters based on the type
             }
                
@@ -373,8 +382,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                             break;
                             default :break;
                     }
-                    
-                    
+                                     
                 }
               
             }
@@ -407,14 +415,11 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                             Instantiate(heavyBandit, spawnPos, Quaternion.identity);
                             break;
                     }
-                    
-                   
+                                    
                 }
                
             }
         }
-
-
 
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
@@ -799,6 +804,37 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         ResetCharacterSelectionUI();
 
     }
+
+    #region Set up UDP client
+    public void StartUDPClient()
+    {
+        udpClient = new UdpClient();
+        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortTCP); // Use the server's IP and UDP port
+    }
+
+    public void SendUDPMessage(string message)
+    {
+        byte[] data = Encoding.ASCII.GetBytes(message);
+        udpClient.Send(data, data.Length, udpServerEndPoint);
+        Debug.Log("UDP message sent: " + message);
+    }
+
+    // Optional: Implement a method to receive UDP data if needed
+    public void StartReceivingUDP()
+    {
+        udpClient.BeginReceive(ReceiveUDP, null);
+    }
+
+    private void ReceiveUDP(IAsyncResult result)
+    {
+        byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
+        // Process received data...
+
+        // Restart listening for UDP data
+        udpClient.BeginReceive(ReceiveUDP, null);
+    }
+
+    #endregion
 }
 
-    
+
