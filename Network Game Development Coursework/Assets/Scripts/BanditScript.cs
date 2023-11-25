@@ -60,7 +60,7 @@ public class BanditScript : MonoBehaviour
 
         Debug.Log($"Am i the host? {isHost}.");
     }
-
+   
     void BanditMovement()
     {
         float horizontalInput = Input.GetAxis("Horizontal");
