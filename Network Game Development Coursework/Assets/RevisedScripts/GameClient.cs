@@ -184,7 +184,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         }else if (message.StartsWith("SetNonHostClientId"))
         {
             string[] splitMessage = message.Split(':');
-            localNonHostClientId = gameServer.NonHostClientID;
+            localNonHostClientId = gameServer.nonHostClientID;
             isHost = false;
             Debug.Log($"Non Host Client ID set: {localNonHostClientId}");
           
@@ -395,19 +395,21 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     string characterName = splitMessage[2];
                     Vector3 spawnPos = spawnPoint.position;
                     spawnPos.z = 0;
+                    
                     Debug.Log($"Instantiate character for host.The host character is {characterName}.");
                   
-                    switch (g_selectedHostCharacter)
+                    switch (characterName)
                     {
                         case "LightBandit":
-                            Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                            lightBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+                            Instantiate(lightBandit, spawnPos, Quaternion.identity);                          
                             break;
                         case "HeavyBandit":
-                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                            heavyBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
                             default :break;
-                    }
-                                     
+                    }                                 
                 }
               
             }
@@ -429,18 +431,22 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     string characterName = splitMessage[2];
                     Vector3 spawnPos = spawnPoint.position;
                     spawnPos.z = 0;
+                  
                     Debug.Log($"Instantiate character for non host! the non-host character is{characterName}");
                    
-                    switch (g_selectedNonHostCharacter)
+                    switch (characterName)
                     {
                         case "LightBandit":
-                            Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                            lightBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
+                            Instantiate(lightBandit, spawnPos, Quaternion.identity);                           
                             break;
                         case "HeavyBandit":
-                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                            heavyBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
+                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
                     }
-                                    
+                    
+
                 }
                
             }
@@ -507,7 +513,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
    
     public bool IsLocal()
     {
-        return localHostClientId == gameServer.hostClientID || localNonHostClientId == gameServer.NonHostClientID;
+        return localHostClientId == gameServer.hostClientID || localNonHostClientId == gameServer.nonHostClientID;
     }
     private void HandleClientDisconnection(string clientInfo)
     {
@@ -652,7 +658,6 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 }
             }
             
-
         });
     }
 

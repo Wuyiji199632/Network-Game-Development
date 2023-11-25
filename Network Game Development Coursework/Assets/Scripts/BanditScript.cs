@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Net;
+using System.Net.Sockets;
 public class BanditScript : MonoBehaviour
 {
     public float moveSpeed = 5.0f,jumpForce=10.0f;
@@ -13,17 +15,16 @@ public class BanditScript : MonoBehaviour
     public float checkRadius = 0.5f;
     public GameServer gameServer;
     public GameClient gameClient;
-    private string localPlayerId;
+    
+    public string playerID=string.Empty;
 
+    public bool isHost = false;
     private void Awake()
     {
         gameServer=FindObjectOfType<GameServer>();
         gameClient=FindObjectOfType<GameClient>();
 
-        // Initialize localPlayerId
-        localPlayerId = gameClient.GetLocalPlayerId();
-
-        Debug.Log($"Awake - Local Player ID: {localPlayerId}");
+       
     }
     // Start is called before the first frame update
     void Start()
@@ -31,11 +32,15 @@ public class BanditScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         identity = GetComponent<Identity>();
         anim = GetComponent<Animator>();
+
+        Debug.Log($"player id is {playerID}.");
+       
     }
 
     // Update is called once per frame
     void Update()
     {
+           
         BanditMovement();
 
         // Handle Jumping
@@ -53,7 +58,7 @@ public class BanditScript : MonoBehaviour
             Attack();
         }
 
-        Debug.Log($"Am i the local player? {gameClient.IsLocal()}.");
+        Debug.Log($"Am i the host? {isHost}.");
     }
 
     void BanditMovement()
@@ -108,15 +113,7 @@ public class BanditScript : MonoBehaviour
         anim.SetTrigger("Attack");
     }
 
-    private bool IsLocalPlayer()
-    {
-
-        //TODO: identify the local player
-
-       
-
-        return gameClient.IsLocal();
-    }
+   
 
     void SendPositionUpdate()
     {
@@ -128,5 +125,8 @@ public class BanditScript : MonoBehaviour
         gameClient.SendUDPMessage(message);
     }
 
-    
+    private bool IsHost()
+    {
+        return playerID==gameClient.localHostClientId;
+    }
 }

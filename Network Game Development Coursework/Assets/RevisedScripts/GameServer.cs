@@ -73,7 +73,7 @@ public class GameServer : MonoBehaviour
 
     public bool isLocalPlayer = false;
 
-    public string hostClientID, NonHostClientID;
+    public string hostClientID, nonHostClientID;
 
     #region UDP variables
 
@@ -335,8 +335,8 @@ public class GameServer : MonoBehaviour
                     session.NonHostSocket = current; // Assign non-host client
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
-                NonHostClientID=current.RemoteEndPoint.ToString();
-                Debug.Log($"The non-host client id is {NonHostClientID}");
+                nonHostClientID=current.RemoteEndPoint.ToString();
+                Debug.Log($"The non-host client id is {nonHostClientID}");
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
                 SyncCharacterSelectionState(current, session);
@@ -916,9 +916,6 @@ public class GameServer : MonoBehaviour
        
     }
 
-    
-
-
     private void BroadcastCharacterSelectionCancellation(GameSession session, string message)
     {
         foreach (var client in session.MemberSockets)
@@ -1070,6 +1067,7 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
+           
             //NotifyHostClientsOfCharacterSelections(session);
             Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
             string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
