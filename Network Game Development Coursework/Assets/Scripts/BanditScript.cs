@@ -18,7 +18,7 @@ public class BanditScript : MonoBehaviour
     
     public string playerID=string.Empty;
 
-    public bool isHost = false;
+    private bool canControl = false;
     private void Awake()
     {
         gameServer=FindObjectOfType<GameServer>();
@@ -32,7 +32,7 @@ public class BanditScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         identity = GetComponent<Identity>();
         anim = GetComponent<Animator>();
-
+        UpdateControlPrivileges();
         Debug.Log($"player id is {playerID}.");
        
     }
@@ -40,7 +40,15 @@ public class BanditScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-           
+        if (canControl)
+        {
+            HandleMovementAndActions();
+        }
+         
+               
+    }
+    private void HandleMovementAndActions()
+    {
         BanditMovement();
 
         // Handle Jumping
@@ -57,10 +65,7 @@ public class BanditScript : MonoBehaviour
         {
             Attack();
         }
-
-        Debug.Log($"Am i the host? {isHost}.");
     }
-   
     void BanditMovement()
     {
         float horizontalInput = Input.GetAxis("Horizontal");
@@ -112,8 +117,16 @@ public class BanditScript : MonoBehaviour
     {
         anim.SetTrigger("Attack");
     }
+    private void UpdateControlPrivileges()
+    {
+        // Check if the playerID matches the client's ID
+        if (gameClient.IsLocal())
+        {
+            canControl = (playerID == gameClient.localHostClientId || playerID == gameClient.localNonHostClientId);
+            //Failed to realise the mechanism that allows for individual control of the character, needs more meditation and deliberate thoughts over it
+        }
+    }
 
-   
 
     void SendPositionUpdate()
     {
