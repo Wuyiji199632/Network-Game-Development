@@ -48,7 +48,7 @@ GameObject:
   - component: {fileID: 7786597223973347579}
   m_Layer: 0
   m_Name: HeavyBandit_0
-  m_TagString: Untagged
+  m_TagString: HeavyBandit
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -207,7 +207,8 @@ MonoBehaviour:
     m_Bits: 8
   groundCheckPoint: {fileID: 6080793263722311216}
   checkRadius: 5
-  networkManager: {fileID: 0}
+  gameServer: {fileID: 0}
+  gameClient: {fileID: 0}
 --- !u!114 &7786597223973347579
 MonoBehaviour:
   m_ObjectHideFlags: 0

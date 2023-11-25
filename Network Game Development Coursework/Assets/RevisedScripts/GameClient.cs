@@ -15,7 +15,7 @@ using System.Linq;
 public class GameClient : MonoBehaviour //This is the class specifying the use of tcp-ip
 {
     public static GameClient Instance;
-    private string roomID;
+    private string roomID,roomPassword;
     private Socket clientSocket;
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
@@ -32,7 +32,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     [SerializeField]
     private InputField createSessionIDField, createSessionPasswordField, joinSessionIDField, joinSessionPasswordField;
     [SerializeField]
-    private UnityEngine.UI.Text gameNameTxt, createRoomTxt, joinRoomTxt, readyTxt,waitForTxt;
+    private UnityEngine.UI.Text gameNameTxt, createRoomTxt, joinRoomTxt, readyTxt,waitForTxt,unableToJoinTxt;
     [SerializeField]
     private Button gameStartBtn;
     public GameServer gameServer;
@@ -50,7 +50,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private bool isReady = false;
 
-    private string localClientId=string.Empty;
+    //public string localClientId=string.Empty;
+    public string localHostClientId=string.Empty,localNonHostClientId=string.Empty;
 
     private bool isHost=false;
 
@@ -64,7 +65,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private string g_selectedHostCharacter=string.Empty,g_selectedNonHostCharacter=string.Empty; // Store the global host and non-host characters
 
-
+    private bool isSocketConnected = false;
     #region UDP variables
 
     private UdpClient udpClient;
@@ -82,6 +83,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     {
         afterSelectionBtn.SetActive(false);
         waitForTxt.gameObject.SetActive(true);
+        unableToJoinTxt.gameObject.SetActive(false);
         //opponentReadyTxt.gameObject.SetActive(false);
         //opponentReadyTxt.text = string.Empty;
     }
@@ -174,22 +176,24 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         if (message.StartsWith("SetHostClientId:"))
         {
             string[] splitMessage= message.Split(':');
-            localClientId = message.Substring("SetHostClientId:".Length);
-            Debug.Log($"Host Client ID set: {localClientId}");
+            localHostClientId = gameServer.hostClientID;
             isHost = true;
+            Debug.Log($"Host Client ID set: {localHostClientId}");
+          
             return; // Exit the method to avoid processing the rest of the function
         }else if (message.StartsWith("SetNonHostClientId"))
         {
             string[] splitMessage = message.Split(':');
-            localClientId = message.Substring("SetNonHostClientId:".Length);
-            Debug.Log($"Non Host Client ID set: {localClientId}");
+            localNonHostClientId = gameServer.NonHostClientID;
             isHost = false;
+            Debug.Log($"Non Host Client ID set: {localNonHostClientId}");
+          
             return; // Exit the method to avoid processing the rest of the function
         }
 
 
 
-        if (message.StartsWith("ProcessCharacterSelectionRequest:"))//Non-host client
+        if (message.StartsWith("ProcessCharacterSelectionRequest:"))//Non-host client's selection message
         {
             // the host should receive and process this request
             string[] splitMessage = message.Split(':');
@@ -263,8 +267,29 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             if (splitMessage.Length > 1)
             {
                 roomID = splitMessage[1];
-                Debug.Log($"Joined room with ID: {roomID}");
+                roomPassword = splitMessage[2];
+                canvas1.gameObject.SetActive(false);
+                canvas2.gameObject.SetActive(true);
+                Debug.Log($"Joined room with ID and Password: {roomID} and {roomPassword}");
             }
+        }
+        if(message.StartsWith("JoinRoom Request Rejected:"))
+        {
+          
+
+            if (!(string.IsNullOrEmpty(joinSessionIDField.text) && string.IsNullOrEmpty(joinSessionPasswordField.text)))
+            {
+                unableToJoinTxt.gameObject.SetActive(true);
+                unableToJoinTxt.text = "Please enter a valid room id and password!";
+            }
+            else
+            {
+                unableToJoinTxt.gameObject.SetActive(true);
+                unableToJoinTxt.text = "room id and password can't be null!";
+            }
+           
+
+            Debug.Log($"You can't join the room because the id-password you enter is incorrect!");
         }
         if (message.StartsWith("HostCharacterReadyUpdate:")) //Rediness update for host
         {
@@ -456,7 +481,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             gameStartBtn.gameObject.SetActive(isOpponentReady);
             //waitForHostTxt.gameObject.SetActive(isOpponentReady);
             waitForTxt.text = $"You are the host!";
-            Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
+            Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localHostClientId}");
 
 
         });
@@ -472,30 +497,18 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                
                 waitForTxt.gameObject.SetActive(isOpponentReady);             
                 waitForTxt.text = $"Wating for the host to start...";
-                Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localClientId}");
+                Debug.Log($"Current client identifier is {clientIdentifier}, current local client id is {localNonHostClientId}");
 
             });
         }
        
 
     }
-    private void InstantiateCharacter(string characterName)
-    {
-        Vector3 spawnPos = spawnPoint.position;
-        spawnPos.z = 0;
-
-        switch (characterName)
-        {
-            case "LightBandit":
-                Instantiate(lightBandit, spawnPos, Quaternion.identity);
-                break;
-            case "HeavyBandit":
-                Instantiate(heavyBandit, spawnPos, Quaternion.identity);
-                break;
-                // Handle other characters if necessary
-        }
-    }
    
+    public bool IsLocal()
+    {
+        return localHostClientId == gameServer.hostClientID || localNonHostClientId == gameServer.NonHostClientID;
+    }
     private void HandleClientDisconnection(string clientInfo)
     {
         // Update the UI to remove the disconnected client
@@ -537,13 +550,14 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     // Call this method when you want to join a room.
     public void SendJoinRoomRequest()
     {
+        
         ResetCharacterSelectionUI();
         string roomID = joinSessionIDField.text;
         string roomPassword = joinSessionPasswordField.text;
         string message = $"JoinRoom:{roomID}:{roomPassword}";
-        canvas1.gameObject.SetActive(false);
-        canvas2.gameObject.SetActive(true);
         SendMessageToServer(message);
+
+                   
     }
 
     // This method sends a message to the server.
@@ -554,10 +568,11 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             byte[] data = Encoding.ASCII.GetBytes(message);
             clientSocket.BeginSend(data, 0, data.Length, SocketFlags.None, SendCallback, null);
             Debug.Log($"Attempting to send message: {message}");
+           
         }
         else
         {
-            Debug.LogError("Cannot send data, socket is not connected!");
+            Debug.LogError("Cannot send data, socket is not connected!");            
             // You could also call ConnectToServer() here to try to reconnect
         }
     }
@@ -756,20 +771,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
         
     }
-    private bool IsHost()
-    {
-        // Ensure the game server and room ID are valid
-        if (gameServer == null || string.IsNullOrEmpty(roomID))
-            return false;
-
-        // Try to get the session from the game server
-        if (gameServer.activeSessions.TryGetValue(roomID, out var session))
-        {
-            // Check if the current client's socket matches the host's socket in the session
-            return clientSocket.RemoteEndPoint.ToString() == session.HostSocket.RemoteEndPoint.ToString();
-        }
-        return false;
-    }
+   
     private void OnApplicationQuit()
     {
         if (clientSocket != null && clientSocket.Connected)

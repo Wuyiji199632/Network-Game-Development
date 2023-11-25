@@ -36,7 +36,6 @@ public class BanditScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        
         BanditMovement();
 
         // Handle Jumping
@@ -54,6 +53,7 @@ public class BanditScript : MonoBehaviour
             Attack();
         }
 
+        Debug.Log($"Am i the local player? {gameClient.IsLocal()}.");
     }
 
     void BanditMovement()
@@ -113,7 +113,9 @@ public class BanditScript : MonoBehaviour
 
         //TODO: identify the local player
 
-        return false;
+       
+
+        return gameClient.IsLocal();
     }
 
     void SendPositionUpdate()

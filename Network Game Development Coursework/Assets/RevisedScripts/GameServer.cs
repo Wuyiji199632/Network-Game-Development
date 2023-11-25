@@ -18,6 +18,7 @@ public class GameSession
 {
     public string RoomID { get; set; } //This is actually the room id for a specific room
     public string Password { get; set; }
+
     public Socket HostSocket { get; set; }
 
     public Socket NonHostSocket { get; set; }
@@ -65,12 +66,14 @@ public class GameServer : MonoBehaviour
     [SerializeField] private Button gameStartBtn;
     GameSession currentGameSession= null;
     private bool hostReady = false,NonHostReady=false;
-
+    public bool canJoinRoom=false;
     public GameObject heavyBanditPrefab, lightBanditPrefab;
 
-    public GameObject udpClientObj,udpServerObj;
+    //public GameObject udpClientObj,udpServerObj;
 
     public bool isLocalPlayer = false;
+
+    public string hostClientID, NonHostClientID;
 
     #region UDP variables
 
@@ -98,6 +101,7 @@ public class GameServer : MonoBehaviour
         gameStartBtn.gameObject.SetActive(false);
 
         waitForHostTxt.gameObject.SetActive(false);
+        
     }
 
     private void OnStartGameClicked()
@@ -289,6 +293,9 @@ public class GameServer : MonoBehaviour
             var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
             activeSessions.Add(roomID, newSession);
             newSession.MemberSockets.Add(current);
+           
+            hostClientID=current.RemoteEndPoint.ToString();
+            Debug.Log($"The host client id is {hostClientID}");
             Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
             SendMessage(current, $"RoomCreated:{roomID}");
             SyncCharacterSelectionState(current, newSession);
@@ -301,6 +308,7 @@ public class GameServer : MonoBehaviour
         }
 
        
+
     }
     private string GenerateUniqueSessionID()
     {
@@ -321,25 +329,29 @@ public class GameServer : MonoBehaviour
         {
             if (roomPassword==session.Password)
             {
+                canJoinRoom = true;
                 if (session.HostSocket != current)
                 {
                     session.NonHostSocket = current; // Assign non-host client
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
-               
+                NonHostClientID=current.RemoteEndPoint.ToString();
+                Debug.Log($"The non-host client id is {NonHostClientID}");
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
-                SendMessage(current, $"JoinRoom Accepted:{roomID}");
+                SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
                 SyncCharacterSelectionState(current, session);
             }
             else
             {
                 // Client provided the wrong password
+               canJoinRoom=false;
                 SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
             }
         }
         else
         {
             //Debug.Log($"Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+            canJoinRoom = false;
             SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
         }
 
