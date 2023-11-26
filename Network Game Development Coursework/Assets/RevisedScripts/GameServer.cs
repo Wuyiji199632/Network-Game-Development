@@ -79,6 +79,7 @@ public class GameServer : MonoBehaviour
     public bool gameStarted = false;
     public List<BanditScript> inGameBandits=new List<BanditScript>();
     public BanditScript hostBandit=null, nonHostBandit=null;
+      
     #region UDP variables
 
     private UdpClient udpServer;
@@ -94,7 +95,7 @@ public class GameServer : MonoBehaviour
     }
     private void Update()
     {
-        if (gameStarted)
+        if (gameStarted)// When the game starts, observe and manipulate the bandit behaviours
         {
             bool flag = false;
             
@@ -103,9 +104,10 @@ public class GameServer : MonoBehaviour
                 flag = true;
                 hostBandit=inGameBandits.Where(t=>t.playerID==t.gameClient.localHostClientId).First();
                 nonHostBandit=inGameBandits.Where(t=>t.playerID==t.gameClient.localNonHostClientId).First();
-                
-                
+                                    
             }
+            
+          
         }
     }
     void Start()
@@ -564,6 +566,17 @@ public class GameServer : MonoBehaviour
                     InstantiateCharacter(current, roomID, characterName);
                 }
                 break;
+            case "InstantiationConfirmation":
+                if (splitData.Length == 3)
+                {
+                    string clientType = splitData[1];
+                    string roomID = splitData[2];
+                    string key = $"{clientType}:{roomID}";
+                    ResendInstantiationRequest(key);
+                    Debug.Log($"Character Instantiation Message Received with {clientType}+{roomID}");
+                }
+
+                    break;
                     default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
@@ -754,7 +767,8 @@ public class GameServer : MonoBehaviour
     }
     private void BroadcastMessageToSession(GameSession session, string message)
     {
-        foreach (var client in session.MemberSockets)
+        /*Without error check*/
+        /* foreach (var client in session.MemberSockets)
         {
             SendMessage(client, message);
         }
@@ -762,8 +776,114 @@ public class GameServer : MonoBehaviour
         if (!session.MemberSockets.Contains(session.HostSocket))
         {
             SendMessage(session.HostSocket, message);
+        }*/
+
+
+        /*With error check*/
+
+        List<Socket> failedSockets = new List<Socket>();
+
+        foreach (var client in session.MemberSockets)
+        {
+            if (!SendMessageWithRetry(client, message))
+            {
+                failedSockets.Add(client);
+            }
+
+        }
+
+        // Also send to host if not included in MemberSockets
+        if (!session.MemberSockets.Contains(session.HostSocket))
+        {
+            if (!SendMessageWithRetry(session.HostSocket, message))
+            {
+                failedSockets.Add(session.HostSocket);
+            }
+        }
+
+        // Handle failed sockets
+        foreach (var failedSocket in failedSockets)
+        {
+            HandleFailedSocket(failedSocket);
         }
     }
+    private bool SendMessageWithRetry(Socket socket, string message, int retryCount = 10) //Re-send the messages for char instantiation when it fails
+    {
+        int attempts = 0;
+        while (attempts < retryCount)
+        {
+            try
+            {
+                SendMessage(socket, message);
+                return true; // Message sent successfully
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to send message to {socket.RemoteEndPoint}. Attempt {attempts + 1}/{retryCount}. Error: {ex.Message}");
+                attempts++;
+            }
+        }
+
+        return false; // Message sending failed after retries
+    }
+    private void HandleFailedSocket(Socket failedSocket)
+    {
+        // Log the error
+        Debug.LogError($"Message sending failed for {failedSocket.RemoteEndPoint}. Removing the client from the session.");
+
+        // Remove the client from the session
+        RemoveClientFromSession(failedSocket);
+
+        // Optionally, notify other clients in the session about the disconnection
+        NotifyClientsOfDisconnection(failedSocket);
+
+        // Close the socket
+        CloseClientSocket(failedSocket);
+    }
+
+    private void RemoveClientFromSession(Socket clientSocket)
+    {
+        foreach (var session in activeSessions.Values)
+        {
+            if (session.MemberSockets.Contains(clientSocket))
+            {
+                session.MemberSockets.Remove(clientSocket);
+                Debug.Log($"Client {clientSocket.RemoteEndPoint} removed from session {session.RoomID}");
+                break; // Assuming a client is only part of one session
+            }
+        }
+    }
+
+    private void NotifyClientsOfDisconnection(Socket disconnectedSocket)
+    {
+        string disconnectMessage = $"ClientDisconnected:{disconnectedSocket.RemoteEndPoint}";
+        foreach (var session in activeSessions.Values)
+        {
+            if (session.MemberSockets.Contains(disconnectedSocket))
+            {
+                foreach (var client in session.MemberSockets)
+                {
+                    SendMessageWithRetry(client, disconnectMessage);
+                }
+                break; // Assuming a client is only part of one session
+            }
+        }
+    }
+
+    private void CloseClientSocket(Socket clientSocket)
+    {
+        try
+        {
+            clientSocket.Shutdown(SocketShutdown.Both);
+            clientSocket.Close();
+            Debug.Log($"Closed connection with {clientSocket.RemoteEndPoint}");
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Error closing socket {clientSocket.RemoteEndPoint}: {ex.Message}");
+        }
+    }
+
     private void HandleCharacterSelectionConfirmed(string roomID, string characterName, string clientEndpoint)
     {
         if (activeSessions.TryGetValue(roomID, out var session))
@@ -1086,19 +1206,55 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-           
-            //NotifyHostClientsOfCharacterSelections(session);
+                   
             Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
             string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
             BroadcastMessageToSession(session, instantiationMsgForHost);
+           // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
 
-            //NotifyNonHostClientsOfCharacterSelections(session);
+
             Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
             string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
             BroadcastMessageToSession(session, instantiationMsgForNonHost);
-
+            //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
         }
     }
+    private void ResendInstantiationRequest(string key) //Please reflect this in the client side so that it ensures re-sending the character instantiation messages
+    {
+        string[] keyParts = key.Split(':');
+        if (keyParts.Length < 2) return; // Safety check
+
+        string clientType = keyParts[0];
+        string roomID = keyParts[1];
+        GameSession session;
+
+        if (!activeSessions.TryGetValue(roomID, out session))
+        {
+            Debug.LogError($"Session not found for {roomID} during resend.");
+            return;
+        }
+
+        string characterName;
+        Socket targetSocket;
+
+        if (clientType == "Host")
+        {
+            characterName = session.SelectedCharacters[session.HostSocket]; // Assuming this is how you store selected characters
+            targetSocket = session.HostSocket;
+        }
+        else // "NonHost"
+        {
+            characterName = session.SelectedCharacters[session.NonHostSocket];
+            targetSocket = session.NonHostSocket;
+        }
+
+        // Construct the message based on client type
+        string instantiationMsg = $"InstantiateCharacterFor{clientType}:{roomID}:{characterName}";
+        SendMessageWithRetry(targetSocket, instantiationMsg);
+
+        Debug.Log($"Resent instantiation message for {characterName} in room {roomID} to {clientType}");
+    }
+
     
     #endregion
 
@@ -1170,6 +1326,7 @@ public class GameServer : MonoBehaviour
         foreach (var clientEndPoint in udpClientEndpoints)
         {
             udpServer.Send(data, data.Length, clientEndPoint);
+            Debug.Log($"Broadcasting messages to all clients in the end point of {clientEndPoint}.");
         }
     }
     #endregion

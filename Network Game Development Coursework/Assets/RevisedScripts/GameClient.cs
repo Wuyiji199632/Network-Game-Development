@@ -419,7 +419,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                             Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
                             default :break;
-                    }                                 
+                    }
+
+                    SendInstantiationConfirmation("Host", roomID);
                 }
               
             }
@@ -457,8 +459,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                             Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
                     }
-                    
 
+                    SendInstantiationConfirmation("NonHost", roomID);
                 }
                
             }
@@ -483,9 +485,13 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         }
 
     }
-    
+    private void SendInstantiationConfirmation(string clientType, string roomID) //Check to see if the instantiation messages are received correctly
+    {
+        string confirmationMessage = $"InstantiationConfirmation:{clientType}:{roomID}";
+        SendMessageToServer(confirmationMessage);
+    }
     // Update the readiness UI for the local client
-   
+
     // Update the readiness UI for the opponent client
     private void UpdateHostReadinessInfo(string characterName, string readinessFlag,string clientIdentifier)
     {
