@@ -142,34 +142,5 @@ public class BanditScript : MonoBehaviour
     {
         anim.SetTrigger("Attack");
     }
-   
-    void SendPositionUpdate()
-    {
-        Vector3 position = transform.position;
-        Quaternion rotation = transform.rotation;
-
-        string message = $"UpdatePosition:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
-
-        gameClient.SendUDPMessage(message);
-    }
-
-    private bool IsHost()
-    {
-        return playerID==gameClient.localHostClientId;
-    }
-
-    private bool CanControlCharacter()
-    {
-        // Check if the playerID of the character matches with the client's host or non-host ID
-        // Assuming the gameClient has a property to identify if the local player is host
-        if (playerID == gameClient.localHostClientId)
-        {
-            return true;
-        }
-        else if (playerID == gameClient.localNonHostClientId)
-        {
-            return true;
-        }
-        return false;
-    }
+     
 }

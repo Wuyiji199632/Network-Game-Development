@@ -566,17 +566,17 @@ public class GameServer : MonoBehaviour
                     InstantiateCharacter(current, roomID, characterName);
                 }
                 break;
-            case "InstantiationConfirmation":
-                if (splitData.Length == 3)
-                {                   
-                    string roomID = splitData[1];   
-                    string characterName = splitData[2];
-                    InstantiateCharacter(current, roomID, characterName);
+            /*case "InstantiationConfirmation":
+            if (splitData.Length == 3)
+            {                   
+                string roomID = splitData[1];   
+                string characterName = splitData[2];
+                InstantiateCharacter(current, roomID, characterName);
 
-                }
+            }
+                break;*/
 
-                    break;
-                    default:
+            default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
         }
@@ -1205,17 +1205,22 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-                   
-            Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
-            string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
-            BroadcastMessageToSession(session, instantiationMsgForHost);
-           // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
+            while (true)
+            {
+                Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
+                string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForHost);
+                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
 
 
-            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
-            string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
-            BroadcastMessageToSession(session, instantiationMsgForNonHost);
-            //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
+                Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+                string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForNonHost);
+                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
+            }
+
+
+
         }
     }
     
