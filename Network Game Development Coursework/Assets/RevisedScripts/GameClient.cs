@@ -13,6 +13,7 @@ using static System.Net.Mime.MediaTypeNames;
 using System.Linq;
 
 
+
 public class GameClient : MonoBehaviour //This is the class specifying the use of tcp-ip
 {
     public static GameClient Instance;
@@ -389,82 +390,19 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
       
         if (message.StartsWith("InstantiateCharacterForHost:"))
         {
-            
-            string[] splitMessage = message.Split(':');
-
-            if (splitMessage.Length >= 2)
-            {
-               
-                if (instantiateNonhostCharForHost)
-                {
-                    instantiateNonhostCharForHost = false;
-                    string roomID = splitMessage[1];
-                    splitMessage[2] = g_selectedHostCharacter;
-                    string characterName = splitMessage[2];
-                    Vector3 spawnPos = spawnPoint.position;
-                    spawnPos.z = 0;
-                    
-                    Debug.Log($"Instantiate character for host.The host character is {characterName}.");
-                  
-                    switch (characterName)
-                    {
-                        case "LightBandit":
-                            lightBandit.GetComponent<BanditScript>().playerID = localHostClientId;
-                            
-                            Instantiate(lightBandit, spawnPos, Quaternion.identity);                          
-                            break;
-                        case "HeavyBandit":
-                            heavyBandit.GetComponent<BanditScript>().playerID = localHostClientId;
-                            
-                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
-                            break;
-                            default :break;
-                    }
-
-                    SendInstantiationConfirmation("Host", roomID);
-                }
-              
-            }
+            ProcessHostCharacterInstantiation(message);
         }
         else if (message.StartsWith("InstantiateCharacterForNonHost:"))
         {
-           
-            string[] splitMessage = message.Split(':');
-
-            if (splitMessage.Length >= 3)
-            {
-               
-
-                if (instantiateHostForNonhost)
-                {
-                    instantiateHostForNonhost = false;
-                    string roomID = splitMessage[1];
-                    splitMessage[2] = g_selectedNonHostCharacter;
-                    string characterName = splitMessage[2];
-                    Vector3 spawnPos = spawnPoint.position;
-                    spawnPos.z = 0;
-                  
-                    Debug.Log($"Instantiate character for non host! the non-host character is{characterName}");
-                   
-                    switch (characterName)
-                    {
-                        case "LightBandit":
-                            
-                            lightBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
-                            Instantiate(lightBandit, spawnPos, Quaternion.identity);                           
-                            break;
-                        case "HeavyBandit":
-                           
-                            heavyBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
-                            Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
-                            break;
-                    }
-
-                    SendInstantiationConfirmation("NonHost", roomID);
-                }
-               
-            }
+            ProcessNonHostCharacterInstantiation(message);
+            
         }
+
+        if (message.StartsWith("ReSendInstantiation:"))
+        {
+            Debug.Log($"Re-instantiate character in order to fix packet losses!");
+        }
+
 
         // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
@@ -484,6 +422,84 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             HandleClientDisconnection(disconnectedClient);
         }
 
+    }
+    private void ProcessNonHostCharacterInstantiation(string msg)
+    {
+        string[] splitMessage = msg.Split(':');
+
+        if (splitMessage.Length >= 3)
+        {
+
+
+            if (instantiateHostForNonhost)
+            {
+                instantiateHostForNonhost = false;
+                string roomID = splitMessage[1];
+                splitMessage[2] = g_selectedNonHostCharacter;
+                string characterName = splitMessage[2];
+                Vector3 spawnPos = spawnPoint.position;
+                spawnPos.z = 0;
+
+                Debug.Log($"Instantiate character for non host! the non-host character is{characterName}");
+
+                switch (characterName)
+                {
+                    case "LightBandit":
+
+                        lightBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+
+                        heavyBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                }
+
+                SendInstantiationConfirmation("NonHost", roomID);
+            }
+
+        }
+    }
+
+    private void ProcessHostCharacterInstantiation(string msg)
+    {
+
+        string[] splitMessage = msg.Split(':');
+
+        if (splitMessage.Length >= 2)
+        {
+
+            if (instantiateNonhostCharForHost)
+            {
+                instantiateNonhostCharForHost = false;
+                string roomID = splitMessage[1];
+                splitMessage[2] = g_selectedHostCharacter;
+                string characterName = splitMessage[2];
+                Vector3 spawnPos = spawnPoint.position;
+                spawnPos.z = 0;
+
+                Debug.Log($"Instantiate character for host.The host character is {characterName}.");
+
+                switch (characterName)
+                {
+                    case "LightBandit":
+                        lightBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+
+                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        break;
+                    case "HeavyBandit":
+                        heavyBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+
+                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                    default: break;
+                }
+
+                SendInstantiationConfirmation("Host", roomID);
+            }
+
+        }
     }
     private void SendInstantiationConfirmation(string clientType, string roomID) //Check to see if the instantiation messages are received correctly
     {

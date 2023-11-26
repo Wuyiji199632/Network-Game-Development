@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 
+
 public class BanditScript : MonoBehaviour
 {
     public float moveSpeed = 5.0f,jumpForce=10.0f;
@@ -37,27 +38,42 @@ public class BanditScript : MonoBehaviour
         
         Debug.Log($"player id is {playerID}.");
 
-        if(isHost)
-        {
-            gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
-        }
-        else
-        {
-            gameServer.hostBandit.GetComponent <BanditScript>().enabled = false;
-        }
 
+        IdentityChecks();
       
     }
 
     // Update is called once per frame
     void Update()
     {
+
         HandleMovementAndActions();
-
-
+      
     }
+    private void IdentityChecks()
+    {
+        if (isHost)
+        {
+            
+            gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
+            Vector3 position = transform.position;
+            Quaternion rotation = transform.rotation;
+            string hostMovementMsg = $"HostMovement:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
+            gameClient.SendUDPMessage(hostMovementMsg);
+        }
+        else
+        {
+            gameServer.hostBandit.GetComponent<BanditScript>().enabled = false;
+            Vector3 position = transform.position;
+            Quaternion rotation = transform.rotation;
+            string NonHostMovementMsg = $"NonHostMovement:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
+            gameClient.SendUDPMessage(NonHostMovementMsg);
+        }
+    }
+
     private void HandleMovementAndActions()
     {
+        
         BanditMovement();
 
         // Handle Jumping

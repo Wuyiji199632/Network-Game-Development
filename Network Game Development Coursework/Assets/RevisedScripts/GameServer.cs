@@ -568,12 +568,11 @@ public class GameServer : MonoBehaviour
                 break;
             case "InstantiationConfirmation":
                 if (splitData.Length == 3)
-                {
-                    string clientType = splitData[1];
-                    string roomID = splitData[2];
-                    string key = $"{clientType}:{roomID}";
-                    ResendInstantiationRequest(key);
-                    Debug.Log($"Character Instantiation Message Received with {clientType}+{roomID}");
+                {                   
+                    string roomID = splitData[1];   
+                    string characterName = splitData[2];
+                    InstantiateCharacter(current, roomID, characterName);
+
                 }
 
                     break;
@@ -1219,40 +1218,18 @@ public class GameServer : MonoBehaviour
             //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
         }
     }
-    private void ResendInstantiationRequest(string key) //Please reflect this in the client side so that it ensures re-sending the character instantiation messages
+    
+    private void ResendInstantiationRequest(Socket current, string roomID, string characterName) //Please reflect this in the client side so that it ensures re-sending the character instantiation messages
     {
-        string[] keyParts = key.Split(':');
-        if (keyParts.Length < 2) return; // Safety check
 
-        string clientType = keyParts[0];
-        string roomID = keyParts[1];
-        GameSession session;
-
-        if (!activeSessions.TryGetValue(roomID, out session))
+        if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-            Debug.LogError($"Session not found for {roomID} during resend.");
-            return;
+            Debug.Log($"Attempting to reinstantiate characters in {roomID}");
+            string resendInstantiationMsg = $"ReSendInstantiation:{roomID}:{characterName}";
+            BroadcastMessageToSession(session, resendInstantiationMsg);
         }
 
-        string characterName;
-        Socket targetSocket;
-
-        if (clientType == "Host")
-        {
-            characterName = session.SelectedCharacters[session.HostSocket]; // Assuming this is how you store selected characters
-            targetSocket = session.HostSocket;
-        }
-        else // "NonHost"
-        {
-            characterName = session.SelectedCharacters[session.NonHostSocket];
-            targetSocket = session.NonHostSocket;
-        }
-
-        // Construct the message based on client type
-        string instantiationMsg = $"InstantiateCharacterFor{clientType}:{roomID}:{characterName}";
-        SendMessageWithRetry(targetSocket, instantiationMsg);
-
-        Debug.Log($"Resent instantiation message for {characterName} in room {roomID} to {clientType}");
+        Debug.Log($"Resent instantiation message for {characterName} in room {roomID}");
     }
 
     
@@ -1310,7 +1287,7 @@ public class GameServer : MonoBehaviour
         }
 
         // Process the message here
-        if (message.StartsWith("UpdatePosition"))
+        if (message.StartsWith("HostMovement:"))
         {
             BroadcastUDPMessage(message); // Broadcast to all clients
         }
