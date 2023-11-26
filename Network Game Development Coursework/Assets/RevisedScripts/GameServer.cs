@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Text;
+using TMPro;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Security.Cryptography;

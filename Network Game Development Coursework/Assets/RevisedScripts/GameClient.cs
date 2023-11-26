@@ -6,6 +6,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using TMPro;
 using UnityEngine.SceneManagement;
 using System.Threading;
 using static System.Net.Mime.MediaTypeNames;
