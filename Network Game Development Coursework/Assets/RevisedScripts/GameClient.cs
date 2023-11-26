@@ -104,6 +104,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             createRoomTxt?.gameObject.SetActive(true);
         }         
     }
+
+
   
     public void ConnectToServer()
     {
@@ -346,7 +348,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
                 gameServer.gameStarted = true;
-             
+                StartReceivingUDP();
+
                 //Instantiate characters based on the type
             }
                
@@ -455,8 +458,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                         Instantiate(heavyBandit, spawnPos, Quaternion.identity);
                         break;
                 }
-
-                SendInstantiationConfirmation("NonHost", roomID);
+                
             }
 
         }
@@ -495,8 +497,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                         break;
                     default: break;
                 }
-
-                SendInstantiationConfirmation("Host", roomID);
+                
             }
 
         }
@@ -850,7 +851,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     public void StartUDPClient()
     {
         udpClient = new UdpClient();
-        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortTCP); // Use the server's IP and UDP port
+        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortUDP); // Use the server's IP and UDP port
     }
 
     public void SendUDPMessage(string message)
@@ -868,11 +869,31 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private void ReceiveUDP(IAsyncResult result)
     {
-        byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
-        // Process received data...
+        try
+        {
+            byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
+            string receivedMessage = Encoding.ASCII.GetString(receivedData);
 
-        // Restart listening for UDP data
-        udpClient.BeginReceive(ReceiveUDP, null);
+            // Process the received message here
+            Debug.Log("Received UDP message: " + receivedMessage);
+
+            // Implement any additional processing of the message as needed
+            ProcessReceivedUDPMessage(receivedMessage);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("Error receiving UDP message: " + ex.Message);
+        }
+        finally
+        {
+            // Restart listening for UDP data
+            StartReceivingUDP();
+        }
+    }
+
+    private void ProcessReceivedUDPMessage(string message)
+    {
+        
     }
     public string GetLocalPlayerId()
     {

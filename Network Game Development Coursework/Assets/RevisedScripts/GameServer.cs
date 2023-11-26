@@ -46,7 +46,7 @@ public class GameServer : MonoBehaviour
     [SerializeField]
     private int tcpPort = 8888;
     [SerializeField]
-    private int udpPort = 8889;
+    private int udpPort = 8899;
     public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
     public Dictionary<string, GameSession> activeSessions=new Dictionary<string, GameSession>();//Dictionary to store the active game sessions
@@ -1219,8 +1219,6 @@ public class GameServer : MonoBehaviour
                 //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
             }
 
-
-
         }
     }
     
@@ -1283,7 +1281,6 @@ public class GameServer : MonoBehaviour
     {
         byte[] receivedData = udpServer.EndReceive(result, ref udpEndPoint);
         string message = Encoding.ASCII.GetString(receivedData);
-        // Process received data...
         Debug.Log("Received UDP message: " + message);
 
         if (!udpClientEndpoints.Any(endpoint => endpoint.Equals(udpEndPoint)))
@@ -1291,13 +1288,15 @@ public class GameServer : MonoBehaviour
             udpClientEndpoints.Add(new IPEndPoint(udpEndPoint.Address, udpEndPoint.Port));
         }
 
-        // Process the message here
         if (message.StartsWith("HostMovement:"))
         {
-            BroadcastUDPMessage(message); // Broadcast to all clients
+            // Broadcast to all clients
+            BroadcastUDPMessage(message);
+
+            // Send a response back to the sender
+            SendUDPResponse("HostMovement received", udpEndPoint);
         }
 
-        // Restart listening for UDP data
         udpServer.BeginReceive(ReceiveUDP, null);
     }
 
@@ -1310,6 +1309,12 @@ public class GameServer : MonoBehaviour
             udpServer.Send(data, data.Length, clientEndPoint);
             Debug.Log($"Broadcasting messages to all clients in the end point of {clientEndPoint}.");
         }
+    }
+    private void SendUDPResponse(string responseMessage, IPEndPoint endPoint)
+    {
+        byte[] data = Encoding.ASCII.GetBytes(responseMessage);
+        udpServer.Send(data, data.Length, endPoint);
+        Debug.Log($"Sent UDP response to {endPoint}: {responseMessage}");
     }
     #endregion
 }
