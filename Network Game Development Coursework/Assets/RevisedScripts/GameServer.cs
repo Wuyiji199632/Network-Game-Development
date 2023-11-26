@@ -75,6 +75,9 @@ public class GameServer : MonoBehaviour
 
     public string hostClientID, nonHostClientID;
 
+    public bool gameStarted = false;
+    public List<BanditScript> inGameBandits=new List<BanditScript>();
+    public BanditScript hostBandit=null, nonHostBandit=null;
     #region UDP variables
 
     private UdpClient udpServer;
@@ -87,6 +90,22 @@ public class GameServer : MonoBehaviour
         
         DontDestroyOnLoad(this);
 
+    }
+    private void Update()
+    {
+        if (gameStarted)
+        {
+            bool flag = false;
+            
+            if(!flag)
+            {
+                flag = true;
+                hostBandit=inGameBandits.Where(t=>t.playerID==t.gameClient.localHostClientId).First();
+                nonHostBandit=inGameBandits.Where(t=>t.playerID==t.gameClient.localNonHostClientId).First();
+                
+                
+            }
+        }
     }
     void Start()
     {
@@ -294,7 +313,7 @@ public class GameServer : MonoBehaviour
             activeSessions.Add(roomID, newSession);
             newSession.MemberSockets.Add(current);
            
-            hostClientID=current.RemoteEndPoint.ToString();
+            hostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
             Debug.Log($"The host client id is {hostClientID}");
             Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
             SendMessage(current, $"RoomCreated:{roomID}");
@@ -335,7 +354,7 @@ public class GameServer : MonoBehaviour
                     session.NonHostSocket = current; // Assign non-host client
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
-                nonHostClientID=current.RemoteEndPoint.ToString();
+                nonHostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
                 Debug.Log($"The non-host client id is {nonHostClientID}");
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
@@ -809,8 +828,7 @@ public class GameServer : MonoBehaviour
             if (!IsHost(current,roomID))
             {
                 string message = $"ProcessCharacterSelectionRequest:{roomID}:{characterName}:{current.RemoteEndPoint.ToString()}";
-                SendMessage(session.HostSocket, message);
-                Debug.Log("Forwarding message to host!");
+                SendMessage(session.HostSocket, message);                
                 session.PlayerCharacters[current] = characterName;
                
             }

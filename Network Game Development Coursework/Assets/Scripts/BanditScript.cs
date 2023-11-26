@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
+
 public class BanditScript : MonoBehaviour
 {
     public float moveSpeed = 5.0f,jumpForce=10.0f;
@@ -17,13 +18,14 @@ public class BanditScript : MonoBehaviour
     public GameClient gameClient;
     
     public string playerID=string.Empty;
-
-    private bool canControl = false;
+    public string memberFlag=string.Empty;
+    private bool isHost = false;
     private void Awake()
     {
         gameServer=FindObjectOfType<GameServer>();
         gameClient=FindObjectOfType<GameClient>();
-
+        gameServer.inGameBandits.Add(this);
+        isHost = playerID == gameClient.localHostClientId;
        
     }
     // Start is called before the first frame update
@@ -32,20 +34,27 @@ public class BanditScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         identity = GetComponent<Identity>();
         anim = GetComponent<Animator>();
-        UpdateControlPrivileges();
+        
         Debug.Log($"player id is {playerID}.");
-       
+
+        if(isHost)
+        {
+            gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
+        }
+        else
+        {
+            gameServer.hostBandit.GetComponent <BanditScript>().enabled = false;
+        }
+
+      
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (canControl)
-        {
-            HandleMovementAndActions();
-        }
-         
-               
+        HandleMovementAndActions();
+
+
     }
     private void HandleMovementAndActions()
     {
@@ -117,17 +126,7 @@ public class BanditScript : MonoBehaviour
     {
         anim.SetTrigger("Attack");
     }
-    private void UpdateControlPrivileges()
-    {
-        // Check if the playerID matches the client's ID
-        if (gameClient.IsLocal())
-        {
-            canControl = (playerID == gameClient.localHostClientId || playerID == gameClient.localNonHostClientId);
-            //Failed to realise the mechanism that allows for individual control of the character, needs more meditation and deliberate thoughts over it
-        }
-    }
-
-
+   
     void SendPositionUpdate()
     {
         Vector3 position = transform.position;
@@ -141,5 +140,20 @@ public class BanditScript : MonoBehaviour
     private bool IsHost()
     {
         return playerID==gameClient.localHostClientId;
+    }
+
+    private bool CanControlCharacter()
+    {
+        // Check if the playerID of the character matches with the client's host or non-host ID
+        // Assuming the gameClient has a property to identify if the local player is host
+        if (playerID == gameClient.localHostClientId)
+        {
+            return true;
+        }
+        else if (playerID == gameClient.localNonHostClientId)
+        {
+            return true;
+        }
+        return false;
     }
 }

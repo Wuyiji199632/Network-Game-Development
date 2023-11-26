@@ -53,7 +53,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     //public string localClientId=string.Empty;
     public string localHostClientId=string.Empty,localNonHostClientId=string.Empty;
 
-    private bool isHost=false;
+    public bool isHost=false;
 
     private bool hostIsReady=false, nonHostIsReady=false;
 
@@ -64,6 +64,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private bool instantiateNonhostCharForHost = false, instantiateHostForNonhost = false;
 
     private string g_selectedHostCharacter=string.Empty,g_selectedNonHostCharacter=string.Empty; // Store the global host and non-host characters
+
+    public string hostMemberFlag=string.Empty,nonHostMemberFlag=string.Empty;
+
+    
 
     private bool isSocketConnected = false;
     #region UDP variables
@@ -300,7 +304,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 string characterName = splitMessage[2];
                 string readinessFlag = splitMessage[3];
                 string memberIdentityFlag= splitMessage[4];
-                string clientIdentifier = splitMessage[5];                        
+                string clientIdentifier = splitMessage[5];
+               
                 UpdateHostReadinessInfo(characterName, readinessFlag,clientIdentifier);
                
                 Debug.Log($"Host client is ready!");
@@ -319,6 +324,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 string readinessFlag = splitMessage[3];
                 string memberIdentityFlag = splitMessage[4];
                 string clientIdentifier = splitMessage[5];
+                
                 UpdateNonHostReadinessInfo(characterName, readinessFlag, clientIdentifier);
                
                 Debug.Log($"Non-host client is ready!");
@@ -337,6 +343,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 canvas1.gameObject.SetActive(false);
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
+                gameServer.gameStarted = true;
              
                 //Instantiate characters based on the type
             }
@@ -402,10 +409,12 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     {
                         case "LightBandit":
                             lightBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+                            
                             Instantiate(lightBandit, spawnPos, Quaternion.identity);                          
                             break;
                         case "HeavyBandit":
                             heavyBandit.GetComponent<BanditScript>().playerID = localHostClientId;
+                            
                             Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
                             default :break;
@@ -437,10 +446,12 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     switch (characterName)
                     {
                         case "LightBandit":
+                            
                             lightBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
                             Instantiate(lightBandit, spawnPos, Quaternion.identity);                           
                             break;
                         case "HeavyBandit":
+                           
                             heavyBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
                             Instantiate(heavyBandit, spawnPos, Quaternion.identity);                           
                             break;
