@@ -54,21 +54,26 @@ public class BanditScript : MonoBehaviour
     {
         if (isHost)
         {
-            
+           
             gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
             Vector3 position = transform.position;
             Quaternion rotation = transform.rotation;
             string hostMovementMsg = $"HostMovement:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
             gameClient.SendUDPMessage(hostMovementMsg);
+            Debug.Log("Identify host!");
         }
         else
         {
+           
             gameServer.hostBandit.GetComponent<BanditScript>().enabled = false;
             Vector3 position = transform.position;
             Quaternion rotation = transform.rotation;
             string NonHostMovementMsg = $"NonHostMovement:{position.x},{position.y},{position.z}:{rotation.x},{rotation.y},{rotation.z},{rotation.w}";
             gameClient.SendUDPMessage(NonHostMovementMsg);
+            Debug.Log("Identify non-host!");
         }
+
+       
     }
 
     private void HandleMovementAndActions()

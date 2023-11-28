@@ -52,8 +52,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private bool isReady = false;
 
-    //public string localClientId=string.Empty;
+  
     public string localHostClientId=string.Empty,localNonHostClientId=string.Empty;
+    private string localClientId=string.Empty;
 
     public bool isHost=false;
 
@@ -81,9 +82,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void Awake()
     {
        
+        Instance = this;
         DontDestroyOnLoad(this);
+        
 
-       
     }
     void Start()
     {
@@ -102,11 +104,14 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             gameNameTxt?.gameObject.SetActive(false);
             createRoomTxt?.gameObject.SetActive(true);
-        }         
+        }
+
+           
     }
 
+    
 
-  
+
     public void ConnectToServer()
     {
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -184,16 +189,17 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         if (message.StartsWith("SetHostClientId:"))
         {
             string[] splitMessage= message.Split(':');
-            localHostClientId = gameServer.hostClientID;
+            localHostClientId = gameServer.hostClientID;              
             isHost = true;
             Debug.Log($"Host Client ID set: {localHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
-        }else if (message.StartsWith("SetNonHostClientId"))
+        }
+        if (message.StartsWith("SetNonHostClientId"))
         {
             string[] splitMessage = message.Split(':');
-            localNonHostClientId = gameServer.nonHostClientID;
-            isHost = false;
+            localNonHostClientId = gameServer.nonHostClientID;          
+            isHost= false;
             Debug.Log($"Non Host Client ID set: {localNonHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
@@ -851,15 +857,26 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     public void StartUDPClient()
     {
         udpClient = new UdpClient();
-        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortUDP); // Use the server's IP and UDP port
+        foreach (var udpEndpoint in gameServer.udpClientEndpoints)
+        {
+            Debug.Log($"UDP Client started for {localHostClientId} or {localNonHostClientId} in the endpoint {udpEndpoint}");
+        }
+             
     }
 
     public void SendUDPMessage(string message)
     {
-        byte[] data = Encoding.ASCII.GetBytes(message);
-        udpClient.Send(data, data.Length, udpServerEndPoint);
-        Debug.Log("UDP message sent: " + message);
+      
+        foreach(var udpEndpoint in gameServer.udpClientEndpoints)
+        {
+            byte[] data = Encoding.ASCII.GetBytes(message);
+            udpClient.Send(data, data.Length, udpEndpoint);
+            Debug.Log($"UDP message sent {message} in {udpEndpoint}. ");
+        }
+       
+        
     }
+
 
     // Optional: Implement a method to receive UDP data if needed
     public void StartReceivingUDP()
@@ -873,12 +890,19 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
             string receivedMessage = Encoding.ASCII.GetString(receivedData);
+            foreach (var udpEndpoint in gameServer.udpClientEndpoints)
+            {
+              
+                Debug.Log("Received UDP message: " + receivedMessage);
 
-            // Process the received message here
-            Debug.Log("Received UDP message: " + receivedMessage);
-
-            // Implement any additional processing of the message as needed
-            ProcessReceivedUDPMessage(receivedMessage);
+                // Process the received message here
+                // ProcessReceivedUDPMessage(receivedMessage);
+                UnityMainThreadDispatcher.RunOnMainThread(() =>
+                {
+                    ProcessReceivedUDPMessage(receivedMessage);
+                });
+            }
+            
         }
         catch (Exception ex)
         {
@@ -886,18 +910,32 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         }
         finally
         {
-            // Restart listening for UDP data
-            StartReceivingUDP();
+            StartReceivingUDP(); // Restart listening for UDP data
         }
     }
 
     private void ProcessReceivedUDPMessage(string message)
     {
-        
+        if(message.StartsWith("HostMovement:"))
+        {
+            Debug.Log($"Handling host movement: {message}");
+        }
+        else if(message.StartsWith("NonHostMovement:"))
+        {
+            Debug.Log($"Handling non-host movement: {message}");
+        }
+        else
+        {
+            Debug.LogError("Unknown UDP message format.");
+        }
+
+
     }
+   
     public string GetLocalPlayerId()
     {
         // Generate a unique identifier for this client
+        
         return Guid.NewGuid().ToString();
     }
     #endregion

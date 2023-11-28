@@ -65,7 +65,7 @@ public class GameServer : MonoBehaviour
     private bool isProcessingCharacterSelection = false;
     [SerializeField] private Text waitForHostTxt;
     [SerializeField] private Button gameStartBtn;
-    GameSession currentGameSession= null;
+    public GameSession currentGameSession= null;
     private bool hostReady = false,NonHostReady=false;
     public bool canJoinRoom=false;
     public GameObject heavyBanditPrefab, lightBanditPrefab;
@@ -73,23 +73,24 @@ public class GameServer : MonoBehaviour
     //public GameObject udpClientObj,udpServerObj;
 
     public bool isLocalPlayer = false;
-
+    public bool isHost = false;
     public string hostClientID, nonHostClientID;
 
     public bool gameStarted = false;
     public List<BanditScript> inGameBandits=new List<BanditScript>();
     public BanditScript hostBandit=null, nonHostBandit=null;
-      
+    public Dictionary<string, IPEndPoint> tcpIdToUdpEndpoint = new Dictionary<string, IPEndPoint>();
+
     #region UDP variables
 
     private UdpClient udpServer;
     private IPEndPoint udpEndPoint;
-    private List<IPEndPoint> udpClientEndpoints = new List<IPEndPoint>();
+    public List<IPEndPoint> udpClientEndpoints = new List<IPEndPoint>();
     
     #endregion
     private void Awake()
     {
-        
+        Instance = this;
         DontDestroyOnLoad(this);
 
     }
@@ -106,8 +107,7 @@ public class GameServer : MonoBehaviour
                 nonHostBandit=inGameBandits.Where(t=>t.playerID==t.gameClient.localNonHostClientId).First();
                                     
             }
-            
-          
+                   
         }
     }
     void Start()
@@ -314,15 +314,17 @@ public class GameServer : MonoBehaviour
             string sessionID = GenerateUniqueSessionID();
             var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
             activeSessions.Add(roomID, newSession);
-            newSession.MemberSockets.Add(current);
-           
+            newSession.MemberSockets.Add(current);          
             hostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
+            tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
+            udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
             Debug.Log($"The host client id is {hostClientID}");
             Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
             SendMessage(current, $"RoomCreated:{roomID}");
             SyncCharacterSelectionState(current, newSession);
             Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
             Debug.Log($"Room {roomID} created. Number of MemberSockets after creation: {newSession.MemberSockets.Count}");
+            
         }
         else
         {
@@ -358,6 +360,8 @@ public class GameServer : MonoBehaviour
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
                 nonHostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
+                tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
+                udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
                 Debug.Log($"The non-host client id is {nonHostClientID}");
                 Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
                 SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
@@ -369,6 +373,7 @@ public class GameServer : MonoBehaviour
                canJoinRoom=false;
                 SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
             }
+           
         }
         else
         {
@@ -1196,6 +1201,7 @@ public class GameServer : MonoBehaviour
 
             //SendMessage(current, startGameMsg);
             BroadcastMessageToSession(session, startGameMsg);
+
         }
             
     }
@@ -1265,9 +1271,13 @@ public class GameServer : MonoBehaviour
     #region Set up UDP Server
     public void StartUDPServer()
     {
-        udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
-        udpServer = new UdpClient(udpEndPoint);
-        Debug.Log("UDP Server started on port " + udpPort);
+        //udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
+        foreach(var udpEndpoint in udpClientEndpoints)
+        {
+            udpServer = new UdpClient(udpEndpoint);
+            Debug.Log($"UDP Server started on port {udpPort}, with endpoint {udpEndpoint}");
+        }
+       
         StartListeningUDP();
     }
 
@@ -1279,38 +1289,48 @@ public class GameServer : MonoBehaviour
 
     private void ReceiveUDP(IAsyncResult result)
     {
-        byte[] receivedData = udpServer.EndReceive(result, ref udpEndPoint);
-        string message = Encoding.ASCII.GetString(receivedData);
-        Debug.Log("Received UDP message: " + message);
-
-        if (!udpClientEndpoints.Any(endpoint => endpoint.Equals(udpEndPoint)))
+        try
         {
-            udpClientEndpoints.Add(new IPEndPoint(udpEndPoint.Address, udpEndPoint.Port));
-        }
+            IPEndPoint senderEndPoint = udpClientEndpoints.FirstOrDefault();
+            byte[] receivedData = udpServer.EndReceive(result, ref senderEndPoint);
 
-        if (message.StartsWith("HostMovement:"))
+            if (udpClientEndpoints.Contains(senderEndPoint))
+            {
+                string receivedMessage = Encoding.ASCII.GetString(receivedData);
+                Debug.Log($"Received UDP message from {senderEndPoint}: {receivedMessage}");
+                // Process the received message as needed
+            }
+            else
+            {
+                Debug.LogWarning($"Received message from unknown client at {senderEndPoint}");
+            }
+        }
+        catch (Exception ex)
         {
-            // Broadcast to all clients
-            BroadcastUDPMessage(message);
-
-            // Send a response back to the sender
-            SendUDPResponse("HostMovement received", udpEndPoint);
+            Debug.LogError($"Error in receiving UDP data: {ex.Message}");
         }
-
-        udpServer.BeginReceive(ReceiveUDP, null);
+        finally
+        {
+            udpServer.BeginReceive(ReceiveUDP, null); // Continue listening for UDP data
+        }
     }
 
-    private void BroadcastUDPMessage(string message)
+    private void BroadcastUDPMessage(string message,IPEndPoint senderEndPoint) 
     {
         byte[] data = Encoding.UTF8.GetBytes(message);
-
+       
         foreach (var clientEndPoint in udpClientEndpoints)
         {
-            udpServer.Send(data, data.Length, clientEndPoint);
-            Debug.Log($"Broadcasting messages to all clients in the end point of {clientEndPoint}.");
+            if (!clientEndPoint.Equals(senderEndPoint)) // Avoid sending back to the sender
+            {
+                udpServer.Send(data, data.Length, clientEndPoint);
+                Debug.Log($"Broadcasting message to {clientEndPoint} with message {message}");
+                //SendUDPResponse(message, clientEndPoint);
+            }
         }
     }
-    private void SendUDPResponse(string responseMessage, IPEndPoint endPoint)
+    
+    private void SendUDPResponse(string responseMessage, IPEndPoint endPoint)//Test function to send messages
     {
         byte[] data = Encoding.ASCII.GetBytes(responseMessage);
         udpServer.Send(data, data.Length, endPoint);
