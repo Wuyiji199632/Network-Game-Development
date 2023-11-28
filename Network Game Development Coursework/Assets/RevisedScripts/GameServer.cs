@@ -571,16 +571,13 @@ public class GameServer : MonoBehaviour
                     InstantiateCharacter(current, roomID, characterName);
                 }
                 break;
-            /*case "InstantiationConfirmation":
-            if (splitData.Length == 3)
-            {                   
-                string roomID = splitData[1];   
-                string characterName = splitData[2];
-                InstantiateCharacter(current, roomID, characterName);
 
-            }
-                break;*/
-
+            case "HostMovement":
+                Debug.Log($"Host is moving .");
+                break;
+            case "NonHostMovement":
+                Debug.Log($"Non-host is moving .");
+                break;
             default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;

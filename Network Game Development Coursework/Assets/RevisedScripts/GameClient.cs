@@ -608,7 +608,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     }
 
     // This method sends a message to the server.
-    private void SendMessageToServer(string message)
+    public void SendMessageToServer(string message)
     {
         if (clientSocket != null && clientSocket.Connected)
         {
