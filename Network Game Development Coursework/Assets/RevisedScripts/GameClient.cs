@@ -57,7 +57,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private string localClientId=string.Empty;
 
     public bool isHost=false;
-
+    [SerializeField]
     private bool hostIsReady=false, nonHostIsReady=false;
 
     public GameObject lightBandit, heavyBandit;
@@ -108,9 +108,6 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
            
     }
-
-    
-
 
     public void ConnectToServer()
     {
@@ -190,7 +187,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             string[] splitMessage= message.Split(':');
             localHostClientId = gameServer.hostClientID;              
-            isHost = true;
+            
             Debug.Log($"Host Client ID set: {localHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
@@ -199,7 +196,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             string[] splitMessage = message.Split(':');
             localNonHostClientId = gameServer.nonHostClientID;          
-            isHost= false;
+           
             Debug.Log($"Non Host Client ID set: {localNonHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
@@ -272,6 +269,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             string[] splitMessage = message.Split(':');
             roomID = splitMessage[1]; // Store the sessionID
             Debug.Log($"Room created with room ID: {roomID}");
+            isHost = true;
             // Update UI to show room as created or navigate to room screen
         }
         if (message.StartsWith("JoinRoom Accepted"))
@@ -284,6 +282,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 roomPassword = splitMessage[2];
                 canvas1.gameObject.SetActive(false);
                 canvas2.gameObject.SetActive(true);
+                isHost = false;
                 Debug.Log($"Joined room with ID and Password: {roomID} and {roomPassword}");
             }
         }
@@ -336,7 +335,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 string clientIdentifier = splitMessage[5];
                 
                 UpdateNonHostReadinessInfo(characterName, readinessFlag, clientIdentifier);
-               
+                nonHostIsReady = true;
                 Debug.Log($"Non-host client is ready!");
             }
         }
@@ -354,7 +353,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 canvas2.gameObject.SetActive(false);
                 inGameCanvas.gameObject.SetActive(true);
                 gameServer.gameStarted = true;
-                StartReceivingUDP();
+                //StartReceivingUDP();
 
                 //Instantiate characters based on the type
             }
@@ -431,15 +430,76 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             HandleClientDisconnection(disconnectedClient);
         }
 
+        if (message.StartsWith("HostMovement:") || message.StartsWith("NonHostMovement:"))
+        {
+            string[] splitData = message.Split(':');
+            if (splitData.Length >= 5)
+            {
+
+
+                Debug.Log($"Parsing posX from {splitData[1]}");
+                Debug.Log($"Parsing posY from {splitData[2]}");
+                Debug.Log($"Parsing rotY from {splitData[3]}");
+                //Debug.Log($"Parsing rotZ from {splitData[4]}");
+
+
+
+                float posX = float.Parse(splitData[1]);
+                float posY = float.Parse(splitData[2]);
+                float rotY = float.Parse(splitData[3]);
+                //float rotZ = float.Parse(splitData[4]);
+
+                Vector3 position = new Vector3(posX, posY, 0);
+                Quaternion rotation = Quaternion.Euler(0, rotY, 0);
+
+                UpdateOpponentCharacter(position, rotation);
+
+
+            }
+          
+        }
+
+        if (message.StartsWith("HostAnimated") || message.StartsWith("NonHostAnimated"))
+        {
+            string[] splitData=message.Split(":");
+
+            if(splitData.Length >= 2)
+            {
+               
+                //UpdateOpponentAnimations();
+                float horizontalInput = float.Parse(splitData[1]);
+                Debug.Log($"Sync animations with {horizontalInput}!");
+                UpdateOpponentAnimations(horizontalInput);
+
+            }
+        }
+
     }
+    private void UpdateOpponentAnimations(float horizontalInput)
+    {
+        gameServer.opponentBandit.horizontalInput = horizontalInput;
+    }
+    public void UpdateOpponentCharacter(Vector3 position, Quaternion rotation)
+    {
+
+        if (gameServer.opponentBandit != null)
+        {
+            gameServer.opponentBandit.transform.position = position;
+            gameServer.opponentBandit.transform.rotation = rotation;
+                  
+        }
+        else
+        {
+            Debug.LogError("Opponent bandit is null");
+        }
+    }
+   
     private void ProcessNonHostCharacterInstantiation(string msg)
     {
         string[] splitMessage = msg.Split(':');
 
         if (splitMessage.Length >= 3)
         {
-
-
             if (instantiateHostForNonhost)
             {
                 instantiateHostForNonhost = false;
@@ -449,35 +509,42 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 Vector3 spawnPos = spawnPoint.position;
                 spawnPos.z = 0;
 
-                Debug.Log($"Instantiate character for non host! the non-host character is{characterName}");
-
+                GameObject instantiatedBandit;
                 switch (characterName)
                 {
                     case "LightBandit":
-
-                        lightBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        instantiatedBandit = Instantiate(lightBandit, spawnPos, Quaternion.identity);
                         break;
                     case "HeavyBandit":
-
-                        heavyBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        instantiatedBandit = Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        break;
+                    default:
+                        instantiatedBandit = null;
                         break;
                 }
-                
-            }
 
+                if (instantiatedBandit != null)
+                {
+                    instantiatedBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
+                    gameServer.nonHostBandit = instantiatedBandit.GetComponent<BanditScript>();
+                  
+                    // Set opponentBandit for the host client
+                    if (isHost)
+                    {
+                        gameServer.opponentBandit = gameServer.nonHostBandit;
+                    }
+                }
+            }
         }
     }
 
+
     private void ProcessHostCharacterInstantiation(string msg)
     {
-
         string[] splitMessage = msg.Split(':');
 
         if (splitMessage.Length >= 2)
         {
-
             if (instantiateNonhostCharForHost)
             {
                 instantiateNonhostCharForHost = false;
@@ -487,27 +554,35 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 Vector3 spawnPos = spawnPoint.position;
                 spawnPos.z = 0;
 
-                Debug.Log($"Instantiate character for host.The host character is {characterName}.");
-
+                GameObject instantiatedBandit;
                 switch (characterName)
                 {
                     case "LightBandit":
-                        lightBandit.GetComponent<BanditScript>().playerID = localHostClientId;
-
-                        Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                        instantiatedBandit = Instantiate(lightBandit, spawnPos, Quaternion.identity);
                         break;
                     case "HeavyBandit":
-                        heavyBandit.GetComponent<BanditScript>().playerID = localHostClientId;
-
-                        Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                        instantiatedBandit = Instantiate(heavyBandit, spawnPos, Quaternion.identity);
                         break;
-                    default: break;
+                    default:
+                        instantiatedBandit = null;
+                        break;
                 }
-                
-            }
 
+                if (instantiatedBandit != null)
+                {
+                    instantiatedBandit.GetComponent<BanditScript>().playerID = localHostClientId;                  
+                    gameServer.hostBandit = instantiatedBandit.GetComponent<BanditScript>();
+
+                    // Set opponentBandit for the non-host client
+                    if (!isHost)
+                    {
+                        gameServer.opponentBandit = gameServer.hostBandit;
+                    }
+                }
+            }
         }
     }
+
     private void SendInstantiationConfirmation(string clientType, string roomID) //Check to see if the instantiation messages are received correctly
     {
         string confirmationMessage = $"InstantiationConfirmation:{clientType}:{roomID}";
@@ -538,7 +613,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         if (!isHost)
         {
             bool isOpponentReady = readinessFlag == "Ready";
-            nonHostIsReady = isOpponentReady;
+           
             UnityMainThreadDispatcher.Instance.Enqueue(() =>
             {
                
@@ -619,7 +694,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         }
         else
         {
-            Debug.LogError("Cannot send data, socket is not connected!");            
+            Debug.LogError("Cannot send data, socket is not connected!");
+            ConnectToServer();
             // You could also call ConnectToServer() here to try to reconnect
         }
     }
@@ -860,6 +936,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         foreach (var udpEndpoint in gameServer.udpClientEndpoints)
         {
             Debug.Log($"UDP Client started for {localHostClientId} or {localNonHostClientId} in the endpoint {udpEndpoint}");
+            udpClient.Connect(udpEndpoint);
         }
              
     }
@@ -870,7 +947,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         foreach(var udpEndpoint in gameServer.udpClientEndpoints)
         {
             byte[] data = Encoding.ASCII.GetBytes(message);
-            udpClient.Send(data, data.Length, udpEndpoint);
+            udpClient.Send(data, data.Length, udpServerEndPoint);
             Debug.Log($"UDP message sent {message} in {udpEndpoint}. ");
         }
        
@@ -888,6 +965,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     {
         try
         {
+            
             byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
             string receivedMessage = Encoding.ASCII.GetString(receivedData);
             foreach (var udpEndpoint in gameServer.udpClientEndpoints)
@@ -939,6 +1017,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         return Guid.NewGuid().ToString();
     }
     #endregion
+
+
+   
 }
 
 

@@ -8,22 +8,4 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Bandits - Pixel Art/Demo/MainMenu.unity
     guid: 2713a029422fa9846b236df914f7bf46
-  - enabled: 1
-    path: Assets/Bandits - Pixel Art/Demo/PasswordSettingRoom.unity
-    guid: 7044c61a9c6a33541aacacc5b0ae17ec
-  - enabled: 1
-    path: Assets/Bandits - Pixel Art/Demo/RoomCreationPage.unity
-    guid: 102de90c766b89f4ca6d6de4c8b82ae9
-  - enabled: 1
-    path: Assets/Bandits - Pixel Art/Demo/JoinRoomPage.unity
-    guid: 1183ae4fcdc78cf42a1684736dffdd17
-  - enabled: 1
-    path: Assets/Bandits - Pixel Art/Demo/SelectionPage.unity
-    guid: 66591c3947d74f24c81e16bd1246acf2
-  - enabled: 1
-    path: Assets/Scenes/LobbyRoom.unity
-    guid: 762cd2fe4ee0b0a42a6541daf07d85ae
-  - enabled: 1
-    path: Assets/Scenes/GameScene.unity
-    guid: 2cda990e2423bbf4892e6590ba056729
   m_configObjects: {}

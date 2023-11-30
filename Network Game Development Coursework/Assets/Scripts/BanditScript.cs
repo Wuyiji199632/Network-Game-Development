@@ -10,8 +10,8 @@ public class BanditScript : MonoBehaviour
     public float moveSpeed = 5.0f,jumpForce=10.0f;
     private Rigidbody2D rb;
     private Identity identity;
-    private Animator anim;
-    private bool isJumping;
+    public Animator anim;
+    public bool isJumping;
     public LayerMask groundLayer;
     public Transform groundCheckPoint;
     public float checkRadius = 0.5f;
@@ -21,6 +21,14 @@ public class BanditScript : MonoBehaviour
     public string playerID=string.Empty;
     public string memberFlag=string.Empty;
     private bool isHost = false;
+    public float horizontalInput;
+   
+
+    public enum BanditActionState { Idle, Run, Jump,Attack}
+
+    public BanditActionState banditActionState = BanditActionState.Idle;
+
+  
     private void Awake()
     {
         gameServer=FindObjectOfType<GameServer>();
@@ -37,7 +45,8 @@ public class BanditScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         identity = GetComponent<Identity>();
         anim = GetComponent<Animator>();
-        
+       
+             
         Debug.Log($"player id is {playerID}.");
 
 
@@ -48,33 +57,67 @@ public class BanditScript : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
+       
         HandleMovementAndActions();
-      
+
+        SendMovementMessages();
+
+        SendAnimationMessages();
+
     }
-    private void IdentityChecks()
+
+
+    private void IdentityChecks()// Needs fixing because disabling the BanditScript is not a good idea because the animations can't be played
     {
-        if (isHost)
+        if (gameClient.isHost)
         {
            
             gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
-            Vector3 position = transform.position;
-            Quaternion rotation = transform.rotation;
-            string hostMovementMsg = $"HostMovement:";
-            gameClient.SendMessageToServer(hostMovementMsg);
+
+           
+
             Debug.Log("Identify host!");
         }
         else
         {
            
             gameServer.hostBandit.GetComponent<BanditScript>().enabled = false;
-            Vector3 position = transform.position;
-            Quaternion rotation = transform.rotation;
-            string NonHostMovementMsg = $"NonHostMovement:";
-            gameClient.SendMessageToServer(NonHostMovementMsg);
+
+           
+
             Debug.Log("Identify non-host!");
         }
 
+        
+
+       
+    }
+    public void SendMovementMessages()
+    {
+        if (gameClient.isHost)
+        {
+            string hostMovementMsg = $"HostMovement:{transform.position.x}:{transform.position.y}:{transform.rotation.eulerAngles.y}:{transform.rotation.eulerAngles.z}";
+            gameClient.SendMessageToServer(hostMovementMsg);
+        }
+        else
+        {
+            string nonHostMovementMsg = $"NonHostMovement:{transform.position.x}:{transform.position.y}:{transform.rotation.eulerAngles.y}:{transform.rotation.eulerAngles.z}";
+            gameClient.SendMessageToServer(nonHostMovementMsg);
+        }
+    }
+
+    public void SendAnimationMessages()
+    {
+        if (gameClient.isHost)
+        {
+            string animationMsg = $"HostAnimated:{horizontalInput}";
+            gameClient.SendMessageToServer(animationMsg);
+        }
+        else
+        {
+            string animationMsg = $"NonHostAnimated:{horizontalInput}";
+            gameClient.SendMessageToServer(animationMsg);
+        }
        
     }
 
@@ -88,7 +131,8 @@ public class BanditScript : MonoBehaviour
         {
             Jump();
         }
-
+        if(isJumping) { banditActionState=BanditActionState.Jump; /*SendStateChangeMessage();*/ }
+        else if(!isJumping&&horizontalInput==0) { banditActionState=BanditActionState.Idle; /*SendStateChangeMessage();*/ }
         // Ground check
         isJumping = !Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
         Debug.Log("Is Jumping?" + isJumping);
@@ -96,11 +140,12 @@ public class BanditScript : MonoBehaviour
         if (Input.GetButtonDown("Fire1"))
         {
             Attack();
+           
         }
     }
     void BanditMovement()
     {
-        float horizontalInput = Input.GetAxis("Horizontal");
+        horizontalInput = Input.GetAxis("Horizontal");
         Vector2 moveDirection = new Vector2(horizontalInput, 0);
 
         // Move the Bandit
@@ -108,13 +153,20 @@ public class BanditScript : MonoBehaviour
 
 
 
-        if(horizontalInput != 0) 
+        if(horizontalInput != 0)
+        {
             anim.SetBool("Run", true);
+            banditActionState = BanditActionState.Run;
+            //SendStateChangeMessage();
+        }
+
         else
+        {
             anim.SetBool("Run", false);
-
-
-
+            banditActionState = BanditActionState.Idle;
+            //SendStateChangeMessage();
+        }
+          
         /*Handle rotation based on identity*/
         if (identity.heavyBandit)
         {
@@ -136,9 +188,16 @@ public class BanditScript : MonoBehaviour
             }
         }
 
-        //SendPositionUpdate();
+       
     }
-  
+
+    public void SendStateChangeMessage()
+    {
+        string message = $"StateChange:{playerID}:{banditActionState}";
+        gameClient.SendMessageToServer(message);
+    }
+
+    
     void Jump()
     {
         rb.velocity = new Vector2(rb.velocity.x, jumpForce);
@@ -148,6 +207,8 @@ public class BanditScript : MonoBehaviour
     void Attack()
     {
         anim.SetTrigger("Attack");
+        banditActionState = BanditActionState.Attack;
+        //SendStateChangeMessage();
     }
      
 }

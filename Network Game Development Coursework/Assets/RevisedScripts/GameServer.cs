@@ -79,6 +79,7 @@ public class GameServer : MonoBehaviour
     public bool gameStarted = false;
     public List<BanditScript> inGameBandits=new List<BanditScript>();
     public BanditScript hostBandit=null, nonHostBandit=null;
+    public BanditScript opponentBandit = null;
     public Dictionary<string, IPEndPoint> tcpIdToUdpEndpoint = new Dictionary<string, IPEndPoint>();
 
     #region UDP variables
@@ -330,9 +331,7 @@ public class GameServer : MonoBehaviour
         {
             SendMessage(current, "Room Created:Fail:Session ID already exists.");
         }
-
-       
-
+      
     }
     private string GenerateUniqueSessionID()
     {
@@ -400,8 +399,9 @@ public class GameServer : MonoBehaviour
         
         string[] splitData = text.Split(':');
         Debug.Log("Interpreting Data: " + text);
-        if (splitData.Length < 2) // Not enough parts to interpret the command.
+        if (splitData.Length < 1) // Not enough parts to interpret the command.
         {
+            Debug.Log($"Message received is {splitData}");
             Debug.LogError("Invalid command received.");
             return;
         }
@@ -573,11 +573,41 @@ public class GameServer : MonoBehaviour
                 break;
 
             case "HostMovement":
-                Debug.Log($"Host is moving .");
+                             
+                Debug.Log($"Host is moving.");
+                var session = FindSessionByClient(current);
+                if (session != null)
+                {
+                    BroadcastMessageToSessionMembers(session, text, current);
+                }
                 break;
             case "NonHostMovement":
-                Debug.Log($"Non-host is moving .");
+                
+                Debug.Log($"Non-host is moving.");
+                var session0 = FindSessionByClient(current);
+                if (session0 != null)
+                {
+                    BroadcastMessageToSessionMembers(session0, text, current);
+                }
                 break;
+            case "HostAnimated":
+                Debug.Log($"Host is animated!");
+                var session1 = FindSessionByClient(current);
+                if (session1 != null)
+                {
+                    BroadcastMessageToSessionMembers(session1, text, current);
+                }
+                break;
+            case "NonHostAnimated":
+                Debug.Log($"Non-ost is animated!");
+                var session2 = FindSessionByClient(current);
+                if (session2 != null)
+                {
+                    BroadcastMessageToSessionMembers(session2, text, current);
+                }
+                break;
+
+
             default:
                 Debug.LogError($"Unknown command received: {commandType}");
                 break;
@@ -1146,6 +1176,30 @@ public class GameServer : MonoBehaviour
        
         Debug.Log($"Processed client leaving: {current.RemoteEndPoint}");
     }
+    public GameSession FindSessionByClient(Socket clientSocket)
+    {
+        // Iterate through all active game sessions
+        foreach (var sessionEntry in activeSessions)
+        {
+            var session = sessionEntry.Value;
+
+            // Check if the client socket is the host of the session
+            if (session.HostSocket == clientSocket||session.NonHostSocket==clientSocket)
+            {
+                return session;
+            }
+
+            // Alternatively, check if the client socket is one of the members (non-host players) of the session
+            if (session.MemberSockets.Contains(clientSocket))
+            {
+                return session;
+            }
+        }
+
+        // Return null if the client socket is not part of any session
+        return null;
+    }
+
     private void CloseSession(GameSession session)
     {
         // Close all member sockets
@@ -1208,19 +1262,16 @@ public class GameServer : MonoBehaviour
     {
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
-            while (true)
-            {
-                Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
-                string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
-                BroadcastMessageToSession(session, instantiationMsgForHost);
-                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
+            Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
+            string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
+            BroadcastMessageToSession(session, instantiationMsgForHost);
+            // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
 
 
-                Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
-                string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
-                BroadcastMessageToSession(session, instantiationMsgForNonHost);
-                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
-            }
+            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+            string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+            BroadcastMessageToSession(session, instantiationMsgForNonHost);
+            //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
 
         }
     }
@@ -1238,10 +1289,14 @@ public class GameServer : MonoBehaviour
         Debug.Log($"Resent instantiation message for {characterName} in room {roomID}");
     }
 
-    
+
     #endregion
 
+    #region In-game Logics
 
+   
+   
+    #endregion
     private void CloseAllSockets()
     {
         foreach (Socket socket in clientSockets)
@@ -1268,10 +1323,11 @@ public class GameServer : MonoBehaviour
     #region Set up UDP Server
     public void StartUDPServer()
     {
+        udpServer = new UdpClient(udpPort);
         //udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
-        foreach(var udpEndpoint in udpClientEndpoints)
+        foreach (var udpEndpoint in udpClientEndpoints)
         {
-            udpServer = new UdpClient(udpEndpoint);
+           
             Debug.Log($"UDP Server started on port {udpPort}, with endpoint {udpEndpoint}");
         }
        
@@ -1288,19 +1344,22 @@ public class GameServer : MonoBehaviour
     {
         try
         {
-            IPEndPoint senderEndPoint = udpClientEndpoints.FirstOrDefault();
+            // Create a temporary endpoint to store the sender's address
+            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);
+
+            // Receive the data and capture the sender's endpoint
             byte[] receivedData = udpServer.EndReceive(result, ref senderEndPoint);
 
-            if (udpClientEndpoints.Contains(senderEndPoint))
-            {
-                string receivedMessage = Encoding.ASCII.GetString(receivedData);
-                Debug.Log($"Received UDP message from {senderEndPoint}: {receivedMessage}");
-                // Process the received message as needed
-            }
-            else
-            {
-                Debug.LogWarning($"Received message from unknown client at {senderEndPoint}");
-            }
+            // Convert the received data to a string message
+            string receivedMessage = Encoding.ASCII.GetString(receivedData);
+            Debug.Log($"Received UDP message from {senderEndPoint}: {receivedMessage}");
+
+            // Process the received message here
+            // Example: ProcessReceivedUDPMessage(receivedMessage, senderEndPoint);
+
+            // Optionally, respond to the sender or broadcast to other clients
+            // Example: SendUDPResponse("Response message", senderEndPoint);
+            SendUDPResponse(receivedMessage, senderEndPoint);
         }
         catch (Exception ex)
         {
@@ -1308,7 +1367,8 @@ public class GameServer : MonoBehaviour
         }
         finally
         {
-            udpServer.BeginReceive(ReceiveUDP, null); // Continue listening for UDP data
+            // Continue listening for UDP data
+            udpServer.BeginReceive(ReceiveUDP, null);
         }
     }
 

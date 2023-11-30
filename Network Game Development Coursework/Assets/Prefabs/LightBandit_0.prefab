@@ -47,6 +47,7 @@ GameObject:
   - component: {fileID: 315366736139166004}
   - component: {fileID: 286248003}
   - component: {fileID: 286248004}
+  - component: {fileID: 4660589281759526380}
   m_Layer: 0
   m_Name: LightBandit_0
   m_TagString: LightBandit
@@ -137,7 +138,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDrag: 0
   m_AngularDrag: 0.05
-  m_GravityScale: 10
+  m_GravityScale: 50
   m_Material: {fileID: 0}
   m_Interpolate: 0
   m_SleepingMode: 1
@@ -208,7 +209,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 400
-  jumpForce: 80
+  jumpForce: 200
+  anim: {fileID: 0}
+  isJumping: 0
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
@@ -216,6 +219,10 @@ MonoBehaviour:
   checkRadius: 5
   gameServer: {fileID: 0}
   gameClient: {fileID: 0}
+  playerID: 
+  memberFlag: 
+  horizontalInput: 0
+  banditActionState: 0
 --- !u!95 &286248004
 Animator:
   serializedVersion: 4
@@ -236,3 +243,17 @@ Animator:
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorControllerStateOnDisable: 0
+--- !u!114 &4660589281759526380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6732647917304232145}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 207a7be762557eb4ba9f743d77cdc5a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anim: {fileID: 286248004}
+  banditScript: {fileID: 286248003}
