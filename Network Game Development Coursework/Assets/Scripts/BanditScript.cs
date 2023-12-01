@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
-
+using JetBrains.Annotations;
 
 public class BanditScript : MonoBehaviour
 {
@@ -71,18 +71,18 @@ public class BanditScript : MonoBehaviour
     {
         if (gameClient.isHost)
         {
-           
+            //gameServer.hostBandit.GetComponent<BanditAnimatorController>().enabled = false;
             gameServer.nonHostBandit.GetComponent<BanditScript>().enabled = false;
-
+           
            
 
             Debug.Log("Identify host!");
         }
         else
         {
-           
+            //gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().enabled = false;
             gameServer.hostBandit.GetComponent<BanditScript>().enabled = false;
-
+            
            
 
             Debug.Log("Identify non-host!");
@@ -152,7 +152,6 @@ public class BanditScript : MonoBehaviour
         rb.velocity = new Vector2(moveDirection.x * moveSpeed, rb.velocity.y);
 
 
-
         if(horizontalInput != 0)
         {
             anim.SetBool("Run", true);
@@ -166,7 +165,8 @@ public class BanditScript : MonoBehaviour
             banditActionState = BanditActionState.Idle;
             //SendStateChangeMessage();
         }
-          
+
+
         /*Handle rotation based on identity*/
         if (identity.heavyBandit)
         {
@@ -188,6 +188,14 @@ public class BanditScript : MonoBehaviour
             }
         }
 
+        if(gameClient.isHost)
+        {
+            Debug.Log($"Host horizontal input is {horizontalInput}.");
+        }
+        else
+        {
+            Debug.Log($"Non host horizontal input is {horizontalInput}.");
+        }
        
     }
 

@@ -12,6 +12,8 @@ public class BanditAnimatorController : MonoBehaviour
     {
         anim=GetComponent<Animator>();
         banditScript=GetComponent<BanditScript>();
+        
+      
     }
 
     // Update is called once per frame
@@ -37,14 +39,22 @@ public class BanditAnimatorController : MonoBehaviour
 
     private void AnimPlayLogics()
     {
+
         horizontalInput = banditScript.horizontalInput;
+        
         if (horizontalInput != 0)
         {
             anim.SetBool("Run", true);
+
+          
         }
         else
         {
             anim.SetBool("Run", false);
         }
+
+       
+
+
     }
 }

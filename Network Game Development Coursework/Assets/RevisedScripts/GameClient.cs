@@ -106,9 +106,17 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             createRoomTxt?.gameObject.SetActive(true);
         }
 
+        if (unableToJoinTxt.gameObject.activeInHierarchy)
+        {
+            StartCoroutine(DisableText());
+        }
            
     }
-
+    private IEnumerator DisableText()
+    {
+        yield return new WaitForSeconds(6);
+        unableToJoinTxt.gameObject.SetActive(false);
+    }
     public void ConnectToServer()
     {
         clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -459,7 +467,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
           
         }
 
-        if (message.StartsWith("HostAnimated") || message.StartsWith("NonHostAnimated"))
+        if (message.StartsWith("HostAnimated"))
         {
             string[] splitData=message.Split(":");
 
@@ -468,7 +476,21 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                
                 //UpdateOpponentAnimations();
                 float horizontalInput = float.Parse(splitData[1]);
-                Debug.Log($"Sync animations with {horizontalInput}!");
+                Debug.Log($"Sync animations for host with {horizontalInput}!");
+                UpdateOpponentAnimations(horizontalInput);
+
+            }
+        }
+        else if (message.StartsWith("NonHostAnimated"))
+        {
+            string[] splitData = message.Split(":");
+
+            if (splitData.Length >= 2)
+            {
+
+                //UpdateOpponentAnimations();
+                float horizontalInput = float.Parse(splitData[1]);
+                Debug.Log($"Sync animations for non-host with {horizontalInput}!");
                 UpdateOpponentAnimations(horizontalInput);
 
             }
@@ -477,7 +499,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     }
     private void UpdateOpponentAnimations(float horizontalInput)
     {
-        gameServer.opponentBandit.horizontalInput = horizontalInput;
+        if (gameServer.opponentBandit != null)
+            gameServer.opponentBandit.horizontalInput = horizontalInput;
+
+        
     }
     public void UpdateOpponentCharacter(Vector3 position, Quaternion rotation)
     {
@@ -695,6 +720,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         else
         {
             Debug.LogError("Cannot send data, socket is not connected!");
+            unableToJoinTxt.gameObject.SetActive(true);
+            unableToJoinTxt.text = $"Socket is not found, fail to join room!";
             ConnectToServer();
             // You could also call ConnectToServer() here to try to reconnect
         }
@@ -890,6 +917,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         joinRoomBtn.gameObject.SetActive(false);
         joinRoomBtn2.gameObject.SetActive(false);
         mainMenuBtn.gameObject.SetActive(false);
+        unableToJoinTxt.gameObject.SetActive(false);
+        unableToJoinTxt.text = string.Empty;
 
         
     }

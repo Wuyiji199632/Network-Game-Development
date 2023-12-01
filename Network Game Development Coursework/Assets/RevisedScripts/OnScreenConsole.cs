@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 
-/*Cite: The writing of this class is referenced from chatGPT as I would like to implement a on-screen debug window for unity editor initially for debugging purposes*/
+/*Cite: The writing of this class is referenced from chatGPT as I would like to implement a on-screen debug window for unity editor initially for debugging purposes or display UI elements by forcing the code execution to the main thread*/
 public class OnScreenConsole : MonoBehaviour
 {
     public Text consoleText;
@@ -22,8 +22,7 @@ public class OnScreenConsole : MonoBehaviour
             instance = this;
            DontDestroyOnLoad(gameObject);
         }
-
-       
+     
     }
 
     public static void Log(string message)

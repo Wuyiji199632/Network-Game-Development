@@ -609,7 +609,7 @@ public class GameServer : MonoBehaviour
 
 
             default:
-                Debug.LogError($"Unknown command received: {commandType}");
+                Debug.Log($"Unknown command received: {commandType}");
                 break;
         }
     }

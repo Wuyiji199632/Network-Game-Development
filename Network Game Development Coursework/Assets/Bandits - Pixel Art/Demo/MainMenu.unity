@@ -3172,8 +3172,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 46.001, y: 610}
-  m_SizeDelta: {x: 2457.5, y: 242.5}
+  m_AnchoredPosition: {x: -0.010132, y: 610}
+  m_SizeDelta: {x: 3840, y: 242.5}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &791990061
 MonoBehaviour:
@@ -3282,12 +3282,14 @@ MonoBehaviour:
   heavyBanditPrefab: {fileID: 6321905939688206999, guid: 968a024a993563545a08d3c535d79a90, type: 3}
   lightBanditPrefab: {fileID: 6732647917304232145, guid: 0473c3c1289d310488e39414f748a52f, type: 3}
   isLocalPlayer: 0
+  isHost: 0
   hostClientID: 
   nonHostClientID: 
   gameStarted: 0
   inGameBandits: []
   hostBandit: {fileID: 0}
   nonHostBandit: {fileID: 0}
+  opponentBandit: {fileID: 0}
 --- !u!1 &821012153
 GameObject:
   m_ObjectHideFlags: 0
@@ -5124,6 +5126,8 @@ MonoBehaviour:
   localHostClientId: 
   localNonHostClientId: 
   isHost: 0
+  hostIsReady: 0
+  nonHostIsReady: 0
   lightBandit: {fileID: 6732647917304232145, guid: 0473c3c1289d310488e39414f748a52f, type: 3}
   heavyBandit: {fileID: 6321905939688206999, guid: 968a024a993563545a08d3c535d79a90, type: 3}
   spawnPoint: {fileID: 331742509}
