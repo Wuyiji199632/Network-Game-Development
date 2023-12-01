@@ -317,6 +317,7 @@ public class GameServer : MonoBehaviour
             activeSessions.Add(roomID, newSession);
             newSession.MemberSockets.Add(current);          
             hostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
+            SendMessage(current, $"SetHostClientId:{hostClientID}");
             tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
             udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
             Debug.Log($"The host client id is {hostClientID}");
@@ -359,6 +360,7 @@ public class GameServer : MonoBehaviour
                 }
                 session.MemberSockets.Add(current); // Add the client to the room's member list
                 nonHostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
+                SendMessage(current, $"SetNonHostClientId:{nonHostClientID}");
                 tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
                 udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
                 Debug.Log($"The non-host client id is {nonHostClientID}");

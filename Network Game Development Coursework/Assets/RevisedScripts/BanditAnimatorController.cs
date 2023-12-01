@@ -7,12 +7,20 @@ public class BanditAnimatorController : MonoBehaviour
     public Animator anim;
     public BanditScript banditScript;
     public float horizontalInput = 0;
+    public bool isLocalPlayer = false;
     // Start is called before the first frame update
     void Start()
     {
         anim=GetComponent<Animator>();
         banditScript=GetComponent<BanditScript>();
-        
+        if (banditScript.gameClient.isHost)
+        {
+            isLocalPlayer = banditScript.playerID == banditScript.gameClient.localHostClientId;
+        }
+        else
+        {
+            isLocalPlayer = banditScript.playerID == banditScript.gameClient.localNonHostClientId;
+        }
       
     }
 
@@ -39,21 +47,21 @@ public class BanditAnimatorController : MonoBehaviour
 
     private void AnimPlayLogics()
     {
+        if(banditScript.gameClient.isHost)
+        horizontalInput = banditScript.hostHorizontalInput;
+        else
+        horizontalInput = banditScript.nonHostHorizontalInput;
 
-        horizontalInput = banditScript.horizontalInput;
-        
         if (horizontalInput != 0)
         {
             anim.SetBool("Run", true);
 
-          
+
         }
         else
         {
             anim.SetBool("Run", false);
         }
-
-       
 
 
     }

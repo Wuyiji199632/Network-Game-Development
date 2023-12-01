@@ -21,7 +21,7 @@ public class BanditScript : MonoBehaviour
     public string playerID=string.Empty;
     public string memberFlag=string.Empty;
     private bool isHost = false;
-    public float horizontalInput;
+    public float hostHorizontalInput,nonHostHorizontalInput;
    
 
     public enum BanditActionState { Idle, Run, Jump,Attack}
@@ -110,12 +110,12 @@ public class BanditScript : MonoBehaviour
     {
         if (gameClient.isHost)
         {
-            string animationMsg = $"HostAnimated:{horizontalInput}";
+            string animationMsg = $"HostAnimated:{hostHorizontalInput}";
             gameClient.SendMessageToServer(animationMsg);
         }
         else
         {
-            string animationMsg = $"NonHostAnimated:{horizontalInput}";
+            string animationMsg = $"NonHostAnimated:{nonHostHorizontalInput}";
             gameClient.SendMessageToServer(animationMsg);
         }
        
@@ -123,79 +123,145 @@ public class BanditScript : MonoBehaviour
 
     private void HandleMovementAndActions()
     {
+        if (gameClient.isHost)
+        {
+            BanditMovement();
+
+            // Handle Jumping
+            if (Input.GetButtonDown("Jump") && !isJumping)
+            {
+                Jump();
+            }
+            if (isJumping) { banditActionState = BanditActionState.Jump; /*SendStateChangeMessage();*/ }
+            else if (!isJumping && hostHorizontalInput == 0) { banditActionState = BanditActionState.Idle; /*SendStateChangeMessage();*/ }
+            // Ground check
+            isJumping = !Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
+            Debug.Log("Is Jumping?" + isJumping);
+
+            if (Input.GetButtonDown("Fire1"))
+            {
+                Attack();
+
+            }
+        }
+        else
+        {
+            BanditMovement();
+
+            // Handle Jumping
+            if (Input.GetButtonDown("Jump") && !isJumping)
+            {
+                Jump();
+            }
+            if (isJumping) { banditActionState = BanditActionState.Jump; /*SendStateChangeMessage();*/ }
+            else if (!isJumping && nonHostHorizontalInput == 0) { banditActionState = BanditActionState.Idle; /*SendStateChangeMessage();*/ }
+            // Ground check
+            isJumping = !Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
+            Debug.Log("Is Jumping?" + isJumping);
+
+            if (Input.GetButtonDown("Fire1"))
+            {
+                Attack();
+
+            }
+        }
         
-        BanditMovement();
-
-        // Handle Jumping
-        if (Input.GetButtonDown("Jump") && !isJumping)
-        {
-            Jump();
-        }
-        if(isJumping) { banditActionState=BanditActionState.Jump; /*SendStateChangeMessage();*/ }
-        else if(!isJumping&&horizontalInput==0) { banditActionState=BanditActionState.Idle; /*SendStateChangeMessage();*/ }
-        // Ground check
-        isJumping = !Physics2D.OverlapCircle(groundCheckPoint.position, checkRadius, groundLayer);
-        Debug.Log("Is Jumping?" + isJumping);
-
-        if (Input.GetButtonDown("Fire1"))
-        {
-            Attack();
-           
-        }
     }
     void BanditMovement()
     {
-        horizontalInput = Input.GetAxis("Horizontal");
-        Vector2 moveDirection = new Vector2(horizontalInput, 0);
-
-        // Move the Bandit
-        rb.velocity = new Vector2(moveDirection.x * moveSpeed, rb.velocity.y);
-
-
-        if(horizontalInput != 0)
+        if (gameClient.isHost)
         {
-            anim.SetBool("Run", true);
-            banditActionState = BanditActionState.Run;
-            //SendStateChangeMessage();
-        }
+            hostHorizontalInput = Input.GetAxis("Horizontal");
+            Vector2 moveDirection = new Vector2(hostHorizontalInput, 0);
 
-        else
-        {
-            anim.SetBool("Run", false);
-            banditActionState = BanditActionState.Idle;
-            //SendStateChangeMessage();
-        }
+            // Move the Bandit
+            rb.velocity = new Vector2(moveDirection.x * moveSpeed, rb.velocity.y);
 
 
-        /*Handle rotation based on identity*/
-        if (identity.heavyBandit)
-        {
-            if (horizontalInput < 0)
-                transform.rotation = new Quaternion(0, 180f, 0, 0);
+            if (hostHorizontalInput != 0)
+            {
+                anim.SetBool("Run", true);
+                banditActionState = BanditActionState.Run;
+                //SendStateChangeMessage();
+            }
 
             else
-                transform.rotation = new Quaternion(0, 0, 0, 0);
-        }
-        else if (identity.lightBandit)
-        {
-            if (horizontalInput <= 0)
             {
-                transform.rotation = new Quaternion(0, 180f, 0, 0);
+                anim.SetBool("Run", false);
+                banditActionState = BanditActionState.Idle;
+                //SendStateChangeMessage();
             }
-            else
-            {
-                transform.rotation = new Quaternion(0, 0, 0, 0);
-            }
-        }
 
-        if(gameClient.isHost)
-        {
-            Debug.Log($"Host horizontal input is {horizontalInput}.");
+
+            /*Handle rotation based on identity*/
+            if (identity.heavyBandit)
+            {
+                if (hostHorizontalInput < 0)
+                    transform.rotation = new Quaternion(0, 180f, 0, 0);
+
+                else
+                    transform.rotation = new Quaternion(0, 0, 0, 0);
+            }
+            else if (identity.lightBandit)
+            {
+                if (hostHorizontalInput <= 0)
+                {
+                    transform.rotation = new Quaternion(0, 180f, 0, 0);
+                }
+                else
+                {
+                    transform.rotation = new Quaternion(0, 0, 0, 0);
+                }
+            }
         }
         else
         {
-            Debug.Log($"Non host horizontal input is {horizontalInput}.");
+            nonHostHorizontalInput = Input.GetAxis("Horizontal");
+            Vector2 moveDirection = new Vector2(nonHostHorizontalInput, 0);
+
+            // Move the Bandit
+            rb.velocity = new Vector2(moveDirection.x * moveSpeed, rb.velocity.y);
+
+
+            if (nonHostHorizontalInput != 0)
+            {
+                anim.SetBool("Run", true);
+                banditActionState = BanditActionState.Run;
+                //SendStateChangeMessage();
+            }
+
+            else
+            {
+                anim.SetBool("Run", false);
+                banditActionState = BanditActionState.Idle;
+                //SendStateChangeMessage();
+            }
+
+
+            /*Handle rotation based on identity*/
+            if (identity.heavyBandit)
+            {
+                if (nonHostHorizontalInput < 0)
+                    transform.rotation = new Quaternion(0, 180f, 0, 0);
+
+                else
+                    transform.rotation = new Quaternion(0, 0, 0, 0);
+            }
+            else if (identity.lightBandit)
+            {
+                if (nonHostHorizontalInput <= 0)
+                {
+                    transform.rotation = new Quaternion(0, 180f, 0, 0);
+                }
+                else
+                {
+                    transform.rotation = new Quaternion(0, 0, 0, 0);
+                }
+            }
         }
+        
+
+        
        
     }
 

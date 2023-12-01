@@ -47,7 +47,7 @@ GameObject:
   - component: {fileID: 315366736139166004}
   - component: {fileID: 286248003}
   - component: {fileID: 286248004}
-  - component: {fileID: 4660589281759526380}
+  - component: {fileID: 393467254688797520}
   m_Layer: 0
   m_Name: LightBandit_0
   m_TagString: LightBandit
@@ -243,7 +243,7 @@ Animator:
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorControllerStateOnDisable: 0
---- !u!114 &4660589281759526380
+--- !u!114 &393467254688797520
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -257,3 +257,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   anim: {fileID: 286248004}
   banditScript: {fileID: 286248003}
+  horizontalInput: 0

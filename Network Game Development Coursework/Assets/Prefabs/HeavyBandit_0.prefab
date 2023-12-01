@@ -46,7 +46,7 @@ GameObject:
   - component: {fileID: 5843468906345451009}
   - component: {fileID: 198447488}
   - component: {fileID: 7786597223973347579}
-  - component: {fileID: 7969156068407545203}
+  - component: {fileID: 6874893669988815313}
   m_Layer: 0
   m_Name: HeavyBandit_0
   m_TagString: HeavyBandit
@@ -230,7 +230,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   heavyBandit: 1
   lightBandit: 0
---- !u!114 &7969156068407545203
+--- !u!114 &6874893669988815313
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -244,3 +244,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   anim: {fileID: 198447483}
   banditScript: {fileID: 198447488}
+  horizontalInput: 0

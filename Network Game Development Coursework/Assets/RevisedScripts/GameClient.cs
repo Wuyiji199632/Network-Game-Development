@@ -477,8 +477,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 //UpdateOpponentAnimations();
                 float horizontalInput = float.Parse(splitData[1]);
                 Debug.Log($"Sync animations for host with {horizontalInput}!");
-                UpdateOpponentAnimations(horizontalInput);
-
+                UpdateOpponentAnimations(horizontalInput);              
             }
         }
         else if (message.StartsWith("NonHostAnimated"))
@@ -492,7 +491,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 float horizontalInput = float.Parse(splitData[1]);
                 Debug.Log($"Sync animations for non-host with {horizontalInput}!");
                 UpdateOpponentAnimations(horizontalInput);
-
+               
             }
         }
 
@@ -500,9 +499,18 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void UpdateOpponentAnimations(float horizontalInput)
     {
         if (gameServer.opponentBandit != null)
-            gameServer.opponentBandit.horizontalInput = horizontalInput;
-
-        
+        {
+            if(isHost)
+            {
+                gameServer.opponentBandit.hostHorizontalInput = horizontalInput;
+            }
+            else
+            {
+                gameServer.opponentBandit.nonHostHorizontalInput = horizontalInput;
+            }
+        }
+           
+      
     }
     public void UpdateOpponentCharacter(Vector3 position, Quaternion rotation)
     {
