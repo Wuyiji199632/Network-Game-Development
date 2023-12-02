@@ -20,9 +20,9 @@ public class BanditScript : MonoBehaviour
     
     public string playerID=string.Empty;
     public string memberFlag=string.Empty;
-    private bool isHost = false;
+    public  bool isHost = false;
     public float hostHorizontalInput,nonHostHorizontalInput;
-   
+    private string attackMessage = "Attack";
 
     public enum BanditActionState { Idle, Run, Jump,Attack}
 
@@ -87,10 +87,7 @@ public class BanditScript : MonoBehaviour
 
             Debug.Log("Identify non-host!");
         }
-
-        
-
-       
+      
     }
     public void SendMovementMessages()
     {
@@ -259,10 +256,7 @@ public class BanditScript : MonoBehaviour
                 }
             }
         }
-        
-
-        
-       
+                    
     }
 
     public void SendStateChangeMessage()
@@ -282,7 +276,21 @@ public class BanditScript : MonoBehaviour
     {
         anim.SetTrigger("Attack");
         banditActionState = BanditActionState.Attack;
-        //SendStateChangeMessage();
+
+
+
+        if (gameClient.isHost)
+        {
+            string attackMsg = $"HostAttack:{attackMessage}";
+            gameClient.SendMessageToServer(attackMsg);
+            //SendStateChangeMessage();
+        }
+        else
+        {
+            string attackMsg = $"NonHostAttack:{attackMessage}";
+            gameClient.SendMessageToServer(attackMsg);
+        }
+
     }
      
 }

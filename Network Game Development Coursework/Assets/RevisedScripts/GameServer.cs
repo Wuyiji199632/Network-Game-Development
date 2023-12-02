@@ -318,6 +318,7 @@ public class GameServer : MonoBehaviour
             newSession.MemberSockets.Add(current);          
             hostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
             SendMessage(current, $"SetHostClientId:{hostClientID}");
+            BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
             tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
             udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
             Debug.Log($"The host client id is {hostClientID}");
@@ -361,6 +362,7 @@ public class GameServer : MonoBehaviour
                 session.MemberSockets.Add(current); // Add the client to the room's member list
                 nonHostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
                 SendMessage(current, $"SetNonHostClientId:{nonHostClientID}");
+                BroadcastMessageToSession(session, $"SetNonHostClientId:{nonHostClientID}");
                 tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
                 udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
                 Debug.Log($"The non-host client id is {nonHostClientID}");
@@ -609,7 +611,22 @@ public class GameServer : MonoBehaviour
                 }
                 break;
 
-
+            case "HostAttack":
+                Debug.Log($"Playing attacking animations for host player!");
+                var session3 = FindSessionByClient(current);
+                if (session3 != null)
+                {
+                    BroadcastMessageToSessionMembers(session3, text, current);
+                }
+                break;
+            case "NonHostAttack":
+                Debug.Log($"Playing attacking animations for host player!");
+                var session4 = FindSessionByClient(current);
+                if (session4 != null)
+                {
+                    BroadcastMessageToSessionMembers(session4, text, current);
+                }
+                break;
             default:
                 Debug.Log($"Unknown command received: {commandType}");
                 break;

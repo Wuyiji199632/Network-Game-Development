@@ -8,6 +8,7 @@ public class BanditAnimatorController : MonoBehaviour
     public BanditScript banditScript;
     public float horizontalInput = 0;
     public bool isLocalPlayer = false;
+    public string attackMsg=string.Empty;
     // Start is called before the first frame update
     void Start()
     {
@@ -19,6 +20,7 @@ public class BanditAnimatorController : MonoBehaviour
         }
         else
         {
+           
             isLocalPlayer = banditScript.playerID == banditScript.gameClient.localNonHostClientId;
         }
       
@@ -27,7 +29,7 @@ public class BanditAnimatorController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        AnimPlayLogics();
+        AnimPlayLogicsForSync();
     }
 
     private void StateChanges()
@@ -45,24 +47,32 @@ public class BanditAnimatorController : MonoBehaviour
         }
     }
 
-    private void AnimPlayLogics()
+    private void AnimPlayLogicsForSync()
     {
-        if(banditScript.gameClient.isHost)
-        horizontalInput = banditScript.hostHorizontalInput;
-        else
-        horizontalInput = banditScript.nonHostHorizontalInput;
-
-        if (horizontalInput != 0)
+        #region Running Animation Playing Logics
+        // Determine the horizontal input based on whether the bandit is local or non-local
+        if (isLocalPlayer)
         {
-            anim.SetBool("Run", true);
-
-
+            // For local player, use the local input
+            horizontalInput = Input.GetAxis("Horizontal");
         }
         else
         {
-            anim.SetBool("Run", false);
+            // For non-local players, use the input received from the network
+            horizontalInput = banditScript.isHost ? banditScript.gameClient.remoteHostHorizontalInput : banditScript.gameClient.remoteNonHostHorizontalInput;
+
+            Debug.Log($"remote player's horizontal input is {horizontalInput}");
+           
         }
 
+        // Set the animation state based on the horizontal input
+        anim.SetBool("Run", horizontalInput != 0);
+        #endregion
 
+        #region Attack Animation Playing Logics
+       
+
+        #endregion
     }
+
 }

@@ -70,7 +70,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     public string hostMemberFlag=string.Empty,nonHostMemberFlag=string.Empty;
 
-    
+    public float remoteHostHorizontalInput, remoteNonHostHorizontalInput;
+
+    public string remoteHostAttackMsg,remoteNonHostAttackMsg;
 
     private bool isSocketConnected = false;
     #region UDP variables
@@ -194,17 +196,18 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         if (message.StartsWith("SetHostClientId:"))
         {
             string[] splitMessage= message.Split(':');
-            localHostClientId = gameServer.hostClientID;              
+            localHostClientId = splitMessage[1];              
             
             Debug.Log($"Host Client ID set: {localHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
         }
-        if (message.StartsWith("SetNonHostClientId"))
+        if (message.StartsWith("SetNonHostClientId:"))
         {
+
             string[] splitMessage = message.Split(':');
-            localNonHostClientId = gameServer.nonHostClientID;          
-           
+            localNonHostClientId = splitMessage[1];
+            
             Debug.Log($"Non Host Client ID set: {localNonHostClientId}");
           
             return; // Exit the method to avoid processing the rest of the function
@@ -477,7 +480,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 //UpdateOpponentAnimations();
                 float horizontalInput = float.Parse(splitData[1]);
                 Debug.Log($"Sync animations for host with {horizontalInput}!");
-                UpdateOpponentAnimations(horizontalInput);              
+                remoteHostHorizontalInput = horizontalInput;
+                //UpdateOpponentAnimations(horizontalInput);              
             }
         }
         else if (message.StartsWith("NonHostAnimated"))
@@ -490,9 +494,32 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 //UpdateOpponentAnimations();
                 float horizontalInput = float.Parse(splitData[1]);
                 Debug.Log($"Sync animations for non-host with {horizontalInput}!");
-                UpdateOpponentAnimations(horizontalInput);
+                remoteNonHostHorizontalInput = horizontalInput;
+                //UpdateOpponentAnimations(horizontalInput);
                
             }
+        }
+
+        if (message.StartsWith("HostAttack:"))
+        {
+            string[] splitData = message.Split(":");
+
+            if(splitData.Length >= 2)
+            {
+                remoteHostAttackMsg = splitData[1];
+                Debug.Log($"Host attacks!");
+               
+            }
+        }
+        else if (message.StartsWith("NonHostAttack:"))
+        {
+            string[] splitData = message.Split(":");
+
+            if(splitData.Length >= 2)
+            {
+                remoteNonHostAttackMsg = splitData[1];
+                Debug.Log($"Non host attacks!");
+            }   
         }
 
     }
