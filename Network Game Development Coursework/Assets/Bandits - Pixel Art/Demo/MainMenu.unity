@@ -5133,6 +5133,14 @@ MonoBehaviour:
   spawnPoint: {fileID: 331742509}
   hostMemberFlag: 
   nonHostMemberFlag: 
+  remoteHostHorizontalInput: 0
+  remoteNonHostHorizontalInput: 0
+  remoteHostAttackMsg: 
+  remoteNonHostAttackMsg: 
+  movementSmoothing: 10
+  positionLerpRate: 10000
+  hostApplyingDamage: 0
+  nonHostApplyingDamage: 0
 --- !u!4 &1361306642
 Transform:
   m_ObjectHideFlags: 0

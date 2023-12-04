@@ -84,8 +84,8 @@ public class GameServer : MonoBehaviour
 
     #region UDP variables
 
-    private UdpClient udpServer;
-    private IPEndPoint udpEndPoint;
+    public UdpClient udpServer;
+    public IPEndPoint udpEndPoint;
     public List<IPEndPoint> udpClientEndpoints = new List<IPEndPoint>();
     
     #endregion
@@ -625,6 +625,22 @@ public class GameServer : MonoBehaviour
                 if (session4 != null)
                 {
                     BroadcastMessageToSessionMembers(session4, text, current);
+                }
+                break;
+            case "HostApplyDamage":
+                Debug.Log($"Host is applying damage!");
+                var session5 = FindSessionByClient(current);
+                if (session5 != null)
+                {
+                    BroadcastMessageToSessionMembers(session5, text, current);
+                }
+                break;
+            case "NonHostApplyDamage":
+                Debug.Log($"Non host is applying damage");
+                var session6 = FindSessionByClient(current);
+                if (session6 != null)
+                {
+                    BroadcastMessageToSessionMembers(session6, text, current);
                 }
                 break;
             default:
@@ -1262,7 +1278,7 @@ public class GameServer : MonoBehaviour
     #region Start Game Logics
     private void StartGameAndLoadAssignGameCharacters(Socket current, string roomID, string characterName)
     {
-        StartUDPServer(); // Start the UDP server
+        //StartUDPServer(); // Start the UDP server
         if (activeSessions.TryGetValue(roomID, out GameSession session))
         {
             Debug.Log($"The game has started and characters are assigned to the individual player");
@@ -1339,18 +1355,15 @@ public class GameServer : MonoBehaviour
         Application.Quit();
         
     }
-    #region Set up UDP Server
+
+    /* #region Set up UDP Server
     public void StartUDPServer()
     {
-        udpServer = new UdpClient(udpPort);
-        //udpEndPoint = new IPEndPoint(IPAddress.Any, udpPort); // Specify your UDP port here
-        foreach (var udpEndpoint in udpClientEndpoints)
-        {
-           
-            Debug.Log($"UDP Server started on port {udpPort}, with endpoint {udpEndpoint}");
-        }
-       
-        StartListeningUDP();
+        udpServer = new UdpClient(udpPort);  // Initialize UDP Server
+        udpEndPoint = new IPEndPoint(IPAddress.Parse(GameClient.Instance.serverIp), udpPort);  // Bind to the UDP port
+        Debug.Log($"UDP Server started on port {udpPort} with end point {udpEndPoint}");
+
+        StartListeningUDP();  // Begin listening for incoming data
     }
 
     private void StartListeningUDP()
@@ -1363,22 +1376,16 @@ public class GameServer : MonoBehaviour
     {
         try
         {
-            // Create a temporary endpoint to store the sender's address
-            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);  // Temporary endpoint to store sender's address
 
-            // Receive the data and capture the sender's endpoint
+            // Receive data and capture sender's endpoint
             byte[] receivedData = udpServer.EndReceive(result, ref senderEndPoint);
-
-            // Convert the received data to a string message
             string receivedMessage = Encoding.ASCII.GetString(receivedData);
+
             Debug.Log($"Received UDP message from {senderEndPoint}: {receivedMessage}");
 
-            // Process the received message here
-            // Example: ProcessReceivedUDPMessage(receivedMessage, senderEndPoint);
-
-            // Optionally, respond to the sender or broadcast to other clients
-            // Example: SendUDPResponse("Response message", senderEndPoint);
-            SendUDPResponse(receivedMessage, senderEndPoint);
+            // Handle the received message based on its content
+           ProcessReceivedUDPMessage(receivedMessage, senderEndPoint);
         }
         catch (Exception ex)
         {
@@ -1386,31 +1393,46 @@ public class GameServer : MonoBehaviour
         }
         finally
         {
-            // Continue listening for UDP data
-            udpServer.BeginReceive(ReceiveUDP, null);
+            StartListeningUDP();
         }
     }
+    private void ProcessReceivedUDPMessage(string message, IPEndPoint sender)
+    {
+        if (message.StartsWith("HostAttack") || message.StartsWith("NonHostAttack"))
+        {
+            // Specific processing for HostAttack and NonHostAttack messages
+            HandleAttackMessages(message, sender);
+            SendUDPResponse(message, sender);
+        }
+        
+    }
 
-    private void BroadcastUDPMessage(string message,IPEndPoint senderEndPoint) 
+    private void HandleAttackMessages(string message, IPEndPoint sender)
+    {
+        Debug.Log($"Handling attack message: {message}+{sender}");
+
+        // Additional logic to process attack messages
+        // Example: Update game state, notify other clients, etc.
+    }
+    private void BroadcastUDPMessage(string message, IPEndPoint senderEndPoint)
     {
         byte[] data = Encoding.UTF8.GetBytes(message);
-       
+
         foreach (var clientEndPoint in udpClientEndpoints)
         {
             if (!clientEndPoint.Equals(senderEndPoint)) // Avoid sending back to the sender
             {
                 udpServer.Send(data, data.Length, clientEndPoint);
-                Debug.Log($"Broadcasting message to {clientEndPoint} with message {message}");
-                //SendUDPResponse(message, clientEndPoint);
             }
         }
     }
-    
+
     private void SendUDPResponse(string responseMessage, IPEndPoint endPoint)//Test function to send messages
     {
         byte[] data = Encoding.ASCII.GetBytes(responseMessage);
         udpServer.Send(data, data.Length, endPoint);
         Debug.Log($"Sent UDP response to {endPoint}: {responseMessage}");
     }
-    #endregion
+    #endregion*/
+
 }

@@ -12,8 +12,48 @@ using System.Threading;
 using static System.Net.Mime.MediaTypeNames;
 using System.Linq;
 
+#region Position Interpolation
+public class PositionInterpolator
+{
+    private Queue<Vector3> positionUpdates = new Queue<Vector3>();
+    private Vector3 currentPosition;
+    private Vector3 targetPosition;
+    private float lerpRate;
 
+    public PositionInterpolator(float lerpRate)
+    {
+        this.lerpRate = lerpRate;
+    }
 
+    public void AddPosition(Vector3 newPosition)
+    {
+        positionUpdates.Enqueue(newPosition);
+        if (positionUpdates.Count == 1)
+        {
+            // Set the current and target positions when the first update is received
+            currentPosition = newPosition;
+            targetPosition = newPosition;
+        }
+    }
+
+    public Vector3 UpdatePosition()
+    {
+        if (positionUpdates.Count > 0 && currentPosition == targetPosition)
+        {
+            // Move to the next position in the queue
+            targetPosition = positionUpdates.Dequeue();
+        }
+
+        if (currentPosition != targetPosition)
+        {
+            // Interpolate towards the target position
+            currentPosition = Vector3.Lerp(currentPosition, targetPosition, Time.deltaTime * lerpRate);
+        }
+
+        return currentPosition;
+    }
+}
+#endregion
 public class GameClient : MonoBehaviour //This is the class specifying the use of tcp-ip
 {
     public static GameClient Instance;
@@ -22,8 +62,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private const int BUFFER_SIZE = 2048;
     private byte[] buffer = new byte[BUFFER_SIZE];
     private string welcomeMsg = "Welcome to the Game Server";
-    [SerializeField]
-    private string serverIp = "127.0.0.1"; //Test with a fixed ip address, we will generate an ip address later on for more robust connection or get the ip address the current network is connected to
+   
+    public string serverIp = "127.0.0.1"; //Test with a fixed ip address, we will generate an ip address later on for more robust connection or get the ip address the current network is connected to
     [SerializeField]
     private int serverPortTCP = 8888;
     [SerializeField]
@@ -74,7 +114,14 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     public string remoteHostAttackMsg,remoteNonHostAttackMsg;
 
+    public float movementSmoothing = 0.1f;
+
+    private PositionInterpolator opponentPositionInterpolator;
+    public float positionLerpRate = 1000.0f;
+
     private bool isSocketConnected = false;
+
+    public bool hostApplyingDamage = false, nonHostApplyingDamage = false;
     #region UDP variables
 
     private UdpClient udpClient;
@@ -94,8 +141,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         afterSelectionBtn.SetActive(false);
         waitForTxt.gameObject.SetActive(true);
         unableToJoinTxt.gameObject.SetActive(false);
-        //opponentReadyTxt.gameObject.SetActive(false);
-        //opponentReadyTxt.text = string.Empty;
+        // Initialize the PositionInterpolator with the desired lerp rate
+        opponentPositionInterpolator = new PositionInterpolator(positionLerpRate);
+       
     }
     private void Update()
     {
@@ -460,7 +508,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 float rotY = float.Parse(splitData[3]);
                 //float rotZ = float.Parse(splitData[4]);
 
-                Vector3 position = new Vector3(posX, posY, 0);
+                Vector2 position = new Vector3(posX, posY);
                 Quaternion rotation = Quaternion.Euler(0, rotY, 0);
 
                 UpdateOpponentCharacter(position, rotation);
@@ -508,6 +556,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             {
                 remoteHostAttackMsg = splitData[1];
                 Debug.Log($"Host attacks!");
+                if (gameServer.hostBandit)
+                {
+                    gameServer.hostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteHostAttackMsg);
+                }
                
             }
         }
@@ -519,8 +571,30 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             {
                 remoteNonHostAttackMsg = splitData[1];
                 Debug.Log($"Non host attacks!");
+
+                if (gameServer.nonHostBandit)
+                {
+                    gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteNonHostAttackMsg);
+                }
             }   
         }
+        /*if (message.StartsWith("HostApplyDamage:"))
+        {
+            if(gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider!=null)
+            {
+                gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= 10;
+                gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
+            }
+        }
+        if (message.StartsWith("NonHostApplyDamage:"))
+        {
+            if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider != null)
+            {
+                gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= 10;
+                gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
+            }
+        }*/
+
 
     }
     private void UpdateOpponentAnimations(float horizontalInput)
@@ -539,14 +613,15 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
            
       
     }
-    public void UpdateOpponentCharacter(Vector3 position, Quaternion rotation)
+    public void UpdateOpponentCharacter(Vector2 position, Quaternion rotation)
     {
 
         if (gameServer.opponentBandit != null)
         {
-            gameServer.opponentBandit.transform.position = position;
+            opponentPositionInterpolator.AddPosition(position);
+            Vector3 interpolatedPosition = opponentPositionInterpolator.UpdatePosition();
+            gameServer.opponentBandit.transform.position = interpolatedPosition;
             gameServer.opponentBandit.transform.rotation = rotation;
-                  
         }
         else
         {
@@ -893,7 +968,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     public void StartGameAndPrepareCharacters()
     {
         Debug.Log("Game started!");
-        StartUDPClient();
+        //StartUDPClient();
         if (nonHostIsReady)
         {
             if (!string.IsNullOrEmpty(selectedCharacter))
@@ -992,31 +1067,24 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         ResetCharacterSelectionUI();
 
     }
-
-    #region Set up UDP client
+    /* #region Set up UDP client
     public void StartUDPClient()
     {
-        udpClient = new UdpClient();
-        foreach (var udpEndpoint in gameServer.udpClientEndpoints)
-        {
-            Debug.Log($"UDP Client started for {localHostClientId} or {localNonHostClientId} in the endpoint {udpEndpoint}");
-            udpClient.Connect(udpEndpoint);
-        }
-             
+        udpClient = new UdpClient();  // Initialize UDP Client
+        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortUDP);  // Configure server end-point
+
+        Debug.Log($"UDP Client started at {udpServerEndPoint}.");
+        StartReceivingUDP();  // Begin listening for incoming data
+
     }
 
-    public void SendUDPMessage(string message)
+    public void SendUDPMessage(string message, IPEndPoint endPoint)
     {
-      
-        foreach(var udpEndpoint in gameServer.udpClientEndpoints)
-        {
-            byte[] data = Encoding.ASCII.GetBytes(message);
-            udpClient.Send(data, data.Length, udpServerEndPoint);
-            Debug.Log($"UDP message sent {message} in {udpEndpoint}. ");
-        }
-       
-        
+        byte[] data = Encoding.ASCII.GetBytes(message);
+        udpClient.Send(data, data.Length, endPoint);
+        Debug.Log($"Sent UDP message: {message} to {endPoint}");
     }
+
 
 
     // Optional: Implement a method to receive UDP data if needed
@@ -1029,22 +1097,21 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     {
         try
         {
-            
-            byte[] receivedData = udpClient.EndReceive(result, ref udpServerEndPoint);
-            string receivedMessage = Encoding.ASCII.GetString(receivedData);
-            foreach (var udpEndpoint in gameServer.udpClientEndpoints)
-            {
-              
-                Debug.Log("Received UDP message: " + receivedMessage);
 
-                // Process the received message here
-                // ProcessReceivedUDPMessage(receivedMessage);
-                UnityMainThreadDispatcher.RunOnMainThread(() =>
-                {
-                    ProcessReceivedUDPMessage(receivedMessage);
-                });
-            }
-            
+            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);  // Temporary endpoint to store sender's address
+
+            // Receive data and capture sender's endpoint
+            byte[] receivedData = udpClient.EndReceive(result, ref senderEndPoint);
+            string receivedMessage = Encoding.ASCII.GetString(receivedData);
+
+            Debug.Log($"Received UDP message: {receivedMessage}");
+
+
+            ProcessReceivedUDPMessage(receivedMessage);
+
+
+            StartReceivingUDP();
+
         }
         catch (Exception ex)
         {
@@ -1058,19 +1125,37 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private void ProcessReceivedUDPMessage(string message)
     {
-        if(message.StartsWith("HostMovement:"))
+        if (message.StartsWith("HostAttack:"))
         {
-            Debug.Log($"Handling host movement: {message}");
-        }
-        else if(message.StartsWith("NonHostMovement:"))
-        {
-            Debug.Log($"Handling non-host movement: {message}");
-        }
-        else
-        {
-            Debug.LogError("Unknown UDP message format.");
+            string[] splitData = message.Split(":");
+
+            if (splitData.Length >= 2)
+            {
+                remoteHostAttackMsg = splitData[1];
+                Debug.Log($"Host attacks!");
+                if (gameServer.hostBandit)
+                {
+                    gameServer.hostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteHostAttackMsg);
+                }
+
+            }
         }
 
+        if (message.StartsWith("NonHostAttack:"))
+        {
+            string[] splitData = message.Split(":");
+
+            if (splitData.Length >= 2)
+            {
+                remoteNonHostAttackMsg = splitData[1];
+                Debug.Log($"Non host attacks!");
+
+                if (gameServer.nonHostBandit)
+                {
+                    gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteNonHostAttackMsg);
+                }
+            }
+        }
 
     }
    
@@ -1080,10 +1165,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         
         return Guid.NewGuid().ToString();
     }
-    #endregion
+    #endregion*/
 
-
-   
 }
 
 

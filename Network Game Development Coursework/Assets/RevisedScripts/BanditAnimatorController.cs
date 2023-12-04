@@ -1,7 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
-
+using UnityEngine.UI;
 public class BanditAnimatorController : MonoBehaviour
 {
     public Animator anim;
@@ -9,11 +10,22 @@ public class BanditAnimatorController : MonoBehaviour
     public float horizontalInput = 0;
     public bool isLocalPlayer = false;
     public string attackMsg=string.Empty;
+    public float health = 100;
+    public float damageAmount = 10,localDamageAmount=5;
+    public SpriteRenderer sprite;
+    private SpriteRenderer opponentSprite;
+    public float colorChangeDuration = 1f;
+    public Slider healthSlider;
+    public BanditAnimatorController opponentBandit;
+    public float smoothingSpeed = 3.0f;
+    public Collider2D opponentCollider=null;
+    public float distanceToOpponent = 0;
     // Start is called before the first frame update
     void Start()
     {
         anim=GetComponent<Animator>();
         banditScript=GetComponent<BanditScript>();
+        sprite=GetComponent<SpriteRenderer>();
         if (banditScript.gameClient.isHost)
         {
             isLocalPlayer = banditScript.playerID == banditScript.gameClient.localHostClientId;
@@ -23,6 +35,16 @@ public class BanditAnimatorController : MonoBehaviour
            
             isLocalPlayer = banditScript.playerID == banditScript.gameClient.localNonHostClientId;
         }
+
+        if (banditScript.gameClient.isHost)
+        {
+            opponentBandit=banditScript.gameServer.nonHostBandit.GetComponentInParent<BanditAnimatorController>();
+
+        }
+        else
+        {
+            opponentBandit = banditScript.gameServer.hostBandit.GetComponentInParent<BanditAnimatorController>();
+        }
       
     }
 
@@ -30,22 +52,18 @@ public class BanditAnimatorController : MonoBehaviour
     void Update()
     {
         AnimPlayLogicsForSync();
-    }
 
-    private void StateChanges()
-    {
-        switch (banditScript.banditActionState)
-        {
-            case BanditScript.BanditActionState.Idle:
-                banditScript.anim.SetBool("Run", false); break;
-            case BanditScript.BanditActionState.Run:
-                banditScript.anim.SetBool("Run", true); break;
-            case BanditScript.BanditActionState.Jump:
-                banditScript.anim.SetTrigger("Jump"); break;
-            case BanditScript.BanditActionState.Attack:
-                banditScript.anim.SetTrigger("Attack"); break;
-        }
+        UpdateHealth();
+
+        CalculateDistanceToOpponent();
+
+
     }
+    private void CalculateDistanceToOpponent()
+    {
+        distanceToOpponent=Vector2.Distance(this.transform.position,opponentBandit.transform.position);
+    }
+   
 
     private void AnimPlayLogicsForSync()
     {
@@ -62,17 +80,83 @@ public class BanditAnimatorController : MonoBehaviour
             horizontalInput = banditScript.isHost ? banditScript.gameClient.remoteHostHorizontalInput : banditScript.gameClient.remoteNonHostHorizontalInput;
 
             Debug.Log($"remote player's horizontal input is {horizontalInput}");
-           
+
         }
 
         // Set the animation state based on the horizontal input
         anim.SetBool("Run", horizontalInput != 0);
-        #endregion
-
-        #region Attack Animation Playing Logics
-       
-
-        #endregion
     }
+    #endregion
+
+
+
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if(collision.gameObject.GetComponent<BanditAnimatorController>()!=null)
+        {
+            opponentCollider = collision;
+            opponentSprite=collision.gameObject.GetComponent<BanditAnimatorController>().sprite;
+            
+            if(isLocalPlayer)
+            collision.gameObject.GetComponent<BanditAnimatorController>().health -= damageAmount/1.35f;
+            else
+            collision.gameObject.GetComponent<BanditAnimatorController>().health-= damageAmount;
+
+
+            if(gameObject.GetComponent<BanditScript>().gameClient.isHost)
+            {
+                string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";
+                banditScript.gameClient.SendMessageToServer(damageMsgFromHost);
+            }
+            else
+            {
+                string damageMsgFromNonHost = $"NonHostApplyDamage:{damageAmount}";
+                banditScript.gameClient.SendMessageToServer(damageMsgFromNonHost);
+            }
+          
+            opponentSprite.color = Color.red;
+
+            StartCoroutine(RecoverColorAfterTakingDamage());
+
+            UpdateHealth();
+
+           
+        }
+    }
+
+    private IEnumerator RecoverColorAfterTakingDamage()
+    {
+        if(opponentSprite!=null)
+        {
+            float elapsed = 0;
+            while (elapsed < colorChangeDuration)
+            {
+                // Gradually interpolate from red to white
+                opponentSprite.color = Color.Lerp(Color.red, Color.white, elapsed / colorChangeDuration);
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Ensure the final color is white
+            opponentSprite.color = Color.white;
+        }
+       
+    }
+
+    public void UpdateHealth()
+    {
+        if (healthSlider)
+        {
+            healthSlider.value = health/100.0f;
+        }
+
+        if (health <= 0)
+        {
+            anim.SetTrigger("Die");
+        }
+    }
+
 
 }

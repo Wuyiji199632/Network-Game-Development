@@ -4,6 +4,7 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 using JetBrains.Annotations;
+using UnityEngine.UIElements;
 
 public class BanditScript : MonoBehaviour
 {
@@ -17,13 +18,16 @@ public class BanditScript : MonoBehaviour
     public float checkRadius = 0.5f;
     public GameServer gameServer;
     public GameClient gameClient;
-    
     public string playerID=string.Empty;
     public string memberFlag=string.Empty;
     public  bool isHost = false;
     public float hostHorizontalInput,nonHostHorizontalInput;
     private string attackMessage = "Attack";
+    public BanditAnimatorController banditAnimController;
 
+    public Vector3 targetPosition; // Target position to interpolate to
+    public Quaternion targetRotation; // Target rotation to interpolate to 
+    public float smoothingSpeed = 5.0f;
     public enum BanditActionState { Idle, Run, Jump,Attack}
 
     public BanditActionState banditActionState = BanditActionState.Idle;
@@ -45,7 +49,7 @@ public class BanditScript : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         identity = GetComponent<Identity>();
         anim = GetComponent<Animator>();
-       
+        banditAnimController = GetComponent<BanditAnimatorController>();
              
         Debug.Log($"player id is {playerID}.");
 
@@ -62,11 +66,17 @@ public class BanditScript : MonoBehaviour
 
         SendMovementMessages();
 
+        //InterpolateMovements();
+
         SendAnimationMessages();
 
     }
 
-
+    private void InterpolateMovements()
+    {
+        transform.position = Vector2.Lerp(transform.position, targetPosition, Time.deltaTime * smoothingSpeed);
+        transform.rotation=Quaternion.Lerp(transform.rotation,targetRotation, Time.deltaTime * smoothingSpeed);
+    }
     private void IdentityChecks()// Needs fixing because disabling the BanditScript is not a good idea because the animations can't be played
     {
         if (gameClient.isHost)
@@ -103,7 +113,7 @@ public class BanditScript : MonoBehaviour
         }
     }
 
-    public void SendAnimationMessages()
+    public void SendAnimationMessages() //Sync for running animations
     {
         if (gameClient.isHost)
         {
@@ -201,14 +211,12 @@ public class BanditScript : MonoBehaviour
             }
             else if (identity.lightBandit)
             {
-                if (hostHorizontalInput <= 0)
-                {
+                if (hostHorizontalInput <= 0)               
                     transform.rotation = new Quaternion(0, 180f, 0, 0);
-                }
-                else
-                {
+                
+                else               
                     transform.rotation = new Quaternion(0, 0, 0, 0);
-                }
+                
             }
         }
         else
@@ -282,15 +290,19 @@ public class BanditScript : MonoBehaviour
         if (gameClient.isHost)
         {
             string attackMsg = $"HostAttack:{attackMessage}";
+            //gameClient.SendUDPMessage(attackMsg,gameServer.udpEndPoint);          
             gameClient.SendMessageToServer(attackMsg);
             //SendStateChangeMessage();
         }
         else
         {
             string attackMsg = $"NonHostAttack:{attackMessage}";
+            //gameClient.SendUDPMessage(attackMsg,gameServer.udpEndPoint);           
             gameClient.SendMessageToServer(attackMsg);
         }
 
     }
-     
+
+   
+
 }
