@@ -82,7 +82,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     public Button heavyBanditBtn, lightBanditBtn;
 
     public Canvas canvas1, canvas2,inGameCanvas;
-    
+
+    public GameObject endGamePanel;
 
     private Dictionary<Socket, List<byte>> clientMessageBuffers = new Dictionary<Socket, List<byte>>();//Ensure dynamic change for buffer sizes
 
@@ -122,12 +123,11 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private bool isSocketConnected = false;
 
     public bool hostApplyingDamage = false, nonHostApplyingDamage = false;
-    #region UDP variables
 
-    private UdpClient udpClient;
-    private IPEndPoint udpServerEndPoint;
+    private float predictedInterpolation;
+
    
-    #endregion
+   
     private void Awake()
     {
        
@@ -457,21 +457,42 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
       
         if (message.StartsWith("InstantiateCharacterForHost:"))
         {
-            ProcessHostCharacterInstantiation(message);
+            try
+            {
+                ProcessHostCharacterInstantiation(message);
+            }
+            catch (Exception e)
+            {
+                if(e is Exception)
+                {
+                    Debug.LogError($"Fail to instantiate host character due to {e}.");
+                }
+            }
+            finally
+            {
+                ProcessHostCharacterInstantiation(message);
+            }
+           
         }
         else if (message.StartsWith("InstantiateCharacterForNonHost:"))
         {
-            ProcessNonHostCharacterInstantiation(message);
-            
+            try
+            {
+                ProcessNonHostCharacterInstantiation(message);
+            }
+            catch(Exception e)
+            {
+                if(e is Exception)
+                {
+                    Debug.LogError($"Fail to instantiate non-host character due to {e}.");
+                }
+            }
+            finally
+            {
+                ProcessNonHostCharacterInstantiation(message);
+            }
         }
-
-        if (message.StartsWith("ReSendInstantiation:"))
-        {
-            Debug.Log($"Re-instantiate character in order to fix packet losses!");
-        }
-
-
-        // Add any logics needed when a message is received here
+       // Add any logics needed when a message is received here
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {
            
@@ -520,32 +541,92 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
         if (message.StartsWith("HostAnimated"))
         {
-            string[] splitData=message.Split(":");
-
-            if(splitData.Length >= 2)
+            try
             {
-               
-                //UpdateOpponentAnimations();
-                float horizontalInput = float.Parse(splitData[1]);
-                Debug.Log($"Sync animations for host with {horizontalInput}!");
-                remoteHostHorizontalInput = horizontalInput;
-                //UpdateOpponentAnimations(horizontalInput);              
+                if (gameServer.hostBandit)
+                {
+                    string[] splitData = message.Split(":");
+
+                    if (splitData.Length >= 2)
+                    {
+
+                        float horizontalInput = float.Parse(splitData[1]);
+                        Debug.Log($"Sync animations for host with {horizontalInput}!");
+                        remoteHostHorizontalInput = horizontalInput;
+
+                    }
+                }
             }
+            catch (Exception e)
+            {
+                if(e is Exception)
+                {
+                    Debug.LogError($"Failed to animate host character because of {e}");
+                }
+            }
+            finally
+            {
+                if (gameServer.hostBandit)
+                {
+                    string[] splitData = message.Split(":");
+
+                    if (splitData.Length >= 2)
+                    {
+
+                        float horizontalInput = float.Parse(splitData[1]);
+                        Debug.Log($"Sync animations for host with {horizontalInput}!");
+                        remoteHostHorizontalInput = horizontalInput;
+
+                    }
+                }
+            }
+            
+           
         }
         else if (message.StartsWith("NonHostAnimated"))
         {
-            string[] splitData = message.Split(":");
-
-            if (splitData.Length >= 2)
+            try
             {
+                if (gameServer.nonHostBandit)
+                {
+                    string[] splitData = message.Split(":");
 
-                //UpdateOpponentAnimations();
-                float horizontalInput = float.Parse(splitData[1]);
-                Debug.Log($"Sync animations for non-host with {horizontalInput}!");
-                remoteNonHostHorizontalInput = horizontalInput;
-                //UpdateOpponentAnimations(horizontalInput);
-               
+                    if (splitData.Length >= 2)
+                    {
+
+                        //UpdateOpponentAnimations();
+                        float horizontalInput = float.Parse(splitData[1]);
+                        Debug.Log($"Sync animations for non-host with {horizontalInput}!");
+                        remoteNonHostHorizontalInput = horizontalInput;
+                        //UpdateOpponentAnimations(horizontalInput);
+
+                    }
+                }
             }
+            catch(Exception e)
+            {
+                Debug.LogError($"Failed to animate non-host character because of {e}");
+            }
+            finally
+            {
+                if (gameServer.nonHostBandit)
+                {
+                    string[] splitData = message.Split(":");
+
+                    if (splitData.Length >= 2)
+                    {
+
+                        //UpdateOpponentAnimations();
+                        float horizontalInput = float.Parse(splitData[1]);
+                        Debug.Log($"Sync animations for non-host with {horizontalInput}!");
+                        remoteNonHostHorizontalInput = horizontalInput;
+                        //UpdateOpponentAnimations(horizontalInput);
+
+                    }
+                }
+            }
+            
+          
         }
 
         if (message.StartsWith("HostAttack:"))
@@ -578,11 +659,29 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 }
             }   
         }
-        /*if (message.StartsWith("HostApplyDamage:"))
+        if (message.StartsWith("HostApplyDamage:"))
         {
             if(gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider!=null)
             {
-                gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= 10;
+
+                predictedInterpolation = UnityEngine.Random.Range(0.5f, 1.5f);
+                if (gameServer.hostBandit.GetComponent<BanditAnimatorController>().distanceToOpponent <= 150.0f)
+                {
+                   
+                    if (gameServer.hostBandit.GetComponent<BanditAnimatorController>().isLocalPlayer)
+                    {
+                        gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.hostBandit.GetComponent<BanditAnimatorController>().localDamageAmount; 
+                        
+                    }
+
+                    else
+                    {
+                        gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.hostBandit.GetComponent<BanditAnimatorController>().damageAmount;
+                    }
+                }
+
+               
+
                 gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
             }
         }
@@ -590,10 +689,30 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider != null)
             {
-                gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= 10;
+                predictedInterpolation = UnityEngine.Random.Range(0.5f, 1.5f);
+                if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().distanceToOpponent <= 150.0f)
+                {
+                   
+                    if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().isLocalPlayer)
+                    {
+                        gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().localDamageAmount;
+                    }
+
+                    else
+                    {
+                        gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().damageAmount;
+                    }
+                }
                 gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
             }
-        }*/
+        }
+
+        if (message.StartsWith("GameEnds:"))
+        {
+            endGamePanel.gameObject.SetActive(true);
+
+                       
+        }
 
 
     }
@@ -672,7 +791,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             }
         }
     }
-
+   
 
     private void ProcessHostCharacterInstantiation(string msg)
     {
@@ -1014,6 +1133,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     }
     public void BackToMenuUIChange()
     {
+        endGamePanel.gameObject.SetActive(false);
+        inGameCanvas.gameObject.SetActive(false);
         canvas1.gameObject.SetActive(true);
         canvas2.gameObject.SetActive(false);
         startGameBtn.gameObject.SetActive(true);
@@ -1027,8 +1148,17 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         joinRoomBtn.gameObject.SetActive(false);
         joinRoomBtn2.gameObject.SetActive(false);
         mainMenuBtn.gameObject.SetActive(false);
-        unableToJoinTxt.gameObject.SetActive(false);
+        unableToJoinTxt.gameObject.SetActive(false);     
         unableToJoinTxt.text = string.Empty;
+
+        if (gameServer.gameStarted)
+        {
+            gameServer.gameStarted = false;
+           foreach(var item in gameServer.inGameBandits)
+           {
+                Destroy(item.gameObject);
+           }
+        }
 
         
     }
@@ -1067,105 +1197,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         ResetCharacterSelectionUI();
 
     }
-    /* #region Set up UDP client
-    public void StartUDPClient()
-    {
-        udpClient = new UdpClient();  // Initialize UDP Client
-        udpServerEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), serverPortUDP);  // Configure server end-point
-
-        Debug.Log($"UDP Client started at {udpServerEndPoint}.");
-        StartReceivingUDP();  // Begin listening for incoming data
-
-    }
-
-    public void SendUDPMessage(string message, IPEndPoint endPoint)
-    {
-        byte[] data = Encoding.ASCII.GetBytes(message);
-        udpClient.Send(data, data.Length, endPoint);
-        Debug.Log($"Sent UDP message: {message} to {endPoint}");
-    }
-
-
-
-    // Optional: Implement a method to receive UDP data if needed
-    public void StartReceivingUDP()
-    {
-        udpClient.BeginReceive(ReceiveUDP, null);
-    }
-
-    private void ReceiveUDP(IAsyncResult result)
-    {
-        try
-        {
-
-            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);  // Temporary endpoint to store sender's address
-
-            // Receive data and capture sender's endpoint
-            byte[] receivedData = udpClient.EndReceive(result, ref senderEndPoint);
-            string receivedMessage = Encoding.ASCII.GetString(receivedData);
-
-            Debug.Log($"Received UDP message: {receivedMessage}");
-
-
-            ProcessReceivedUDPMessage(receivedMessage);
-
-
-            StartReceivingUDP();
-
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError("Error receiving UDP message: " + ex.Message);
-        }
-        finally
-        {
-            StartReceivingUDP(); // Restart listening for UDP data
-        }
-    }
-
-    private void ProcessReceivedUDPMessage(string message)
-    {
-        if (message.StartsWith("HostAttack:"))
-        {
-            string[] splitData = message.Split(":");
-
-            if (splitData.Length >= 2)
-            {
-                remoteHostAttackMsg = splitData[1];
-                Debug.Log($"Host attacks!");
-                if (gameServer.hostBandit)
-                {
-                    gameServer.hostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteHostAttackMsg);
-                }
-
-            }
-        }
-
-        if (message.StartsWith("NonHostAttack:"))
-        {
-            string[] splitData = message.Split(":");
-
-            if (splitData.Length >= 2)
-            {
-                remoteNonHostAttackMsg = splitData[1];
-                Debug.Log($"Non host attacks!");
-
-                if (gameServer.nonHostBandit)
-                {
-                    gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(remoteNonHostAttackMsg);
-                }
-            }
-        }
-
-    }
    
-    public string GetLocalPlayerId()
-    {
-        // Generate a unique identifier for this client
-        
-        return Guid.NewGuid().ToString();
-    }
-    #endregion*/
 
 }
 

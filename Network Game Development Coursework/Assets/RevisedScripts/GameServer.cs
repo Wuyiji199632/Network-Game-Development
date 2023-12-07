@@ -59,7 +59,6 @@ public class GameServer : MonoBehaviour
 
     private readonly object characterSelectLock = new object();
 
-    private readonly object characterReadyLock=new object();
 
     private Queue<Action> characterSelectionQueue = new Queue<Action>();
     private bool isProcessingCharacterSelection = false;
@@ -76,19 +75,13 @@ public class GameServer : MonoBehaviour
     public bool isHost = false;
     public string hostClientID, nonHostClientID;
 
-    public bool gameStarted = false;
+    public bool gameStarted = false,gameEnds=false;
     public List<BanditScript> inGameBandits=new List<BanditScript>();
     public BanditScript hostBandit=null, nonHostBandit=null;
     public BanditScript opponentBandit = null;
     public Dictionary<string, IPEndPoint> tcpIdToUdpEndpoint = new Dictionary<string, IPEndPoint>();
-
-    #region UDP variables
-
-    public UdpClient udpServer;
-    public IPEndPoint udpEndPoint;
-    public List<IPEndPoint> udpClientEndpoints = new List<IPEndPoint>();
-    
-    #endregion
+    public BanditScript defeatedBandit = null;
+   
     private void Awake()
     {
         Instance = this;
@@ -137,7 +130,7 @@ public class GameServer : MonoBehaviour
         tcpServerSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         tcpServerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true); //Ensure that each socket address can be reused
         tcpServerSocket.Bind(new IPEndPoint(IPAddress.Any, tcpPort));
-        tcpServerSocket.Listen(10);
+        tcpServerSocket.Listen(100);
         isRunning = true;
         tcpServerSocket.BeginAccept(AcceptCallback, null);
 
@@ -310,29 +303,66 @@ public class GameServer : MonoBehaviour
 
     private void CreateRoom(Socket current, string roomID, string roomPassword)
     {
-        if (!activeSessions.ContainsKey(roomID))
+        try
         {
-            string sessionID = GenerateUniqueSessionID();
-            var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
-            activeSessions.Add(roomID, newSession);
-            newSession.MemberSockets.Add(current);          
-            hostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
-            SendMessage(current, $"SetHostClientId:{hostClientID}");
-            BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
-            tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
-            udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
-            Debug.Log($"The host client id is {hostClientID}");
-            Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
-            SendMessage(current, $"RoomCreated:{roomID}");
-            SyncCharacterSelectionState(current, newSession);
-            Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
-            Debug.Log($"Room {roomID} created. Number of MemberSockets after creation: {newSession.MemberSockets.Count}");
-            
+            if (!activeSessions.ContainsKey(roomID))
+            {
+                string sessionID = GenerateUniqueSessionID();
+                var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
+                activeSessions.Add(roomID, newSession);
+                newSession.MemberSockets.Add(current);
+                hostClientID = current.RemoteEndPoint.ToString().Split(":")[1];
+                SendMessage(current, $"SetHostClientId:{hostClientID}");
+                BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
+                tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
+
+                Debug.Log($"The host client id is {hostClientID}");
+                Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
+                SendMessage(current, $"RoomCreated:{roomID}");
+                SyncCharacterSelectionState(current, newSession);
+                Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
+                Debug.Log($"Room {roomID} created. Number of MemberSockets after creation: {newSession.MemberSockets.Count}");
+
+            }
+            else
+            {
+                SendMessage(current, "Room Created:Fail:Session ID already exists.");
+            }
         }
-        else
+        catch (Exception e)
         {
-            SendMessage(current, "Room Created:Fail:Session ID already exists.");
+            if(e is SocketException||e is Exception)
+            {
+                Debug.LogError($"Fail to create a room due to {e}");
+            }
         }
+        finally
+        {
+            if (!activeSessions.ContainsKey(roomID))
+            {
+                string sessionID = GenerateUniqueSessionID();
+                var newSession = new GameSession { RoomID = roomID, Password = roomPassword, HostSocket = current, PlayerCharacters = new Dictionary<Socket, string>() };
+                activeSessions.Add(roomID, newSession);
+                newSession.MemberSockets.Add(current);
+                hostClientID = current.RemoteEndPoint.ToString().Split(":")[1];
+                SendMessage(current, $"SetHostClientId:{hostClientID}");
+                BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
+                tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
+
+                Debug.Log($"The host client id is {hostClientID}");
+                Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
+                SendMessage(current, $"RoomCreated:{roomID}");
+                SyncCharacterSelectionState(current, newSession);
+                Debug.Log($"Room created with session ID: {sessionID}, Active Room ID: {string.Join(", ", activeSessions.Keys)}, Active Room Password: {newSession.Password}");
+                Debug.Log($"Room {roomID} created. Number of MemberSockets after creation: {newSession.MemberSockets.Count}");
+
+            }
+            else
+            {
+                SendMessage(current, "Room Created:Fail:Session ID already exists.");
+            }
+        }
+       
       
     }
     private string GenerateUniqueSessionID()
@@ -347,43 +377,94 @@ public class GameServer : MonoBehaviour
 
     private void JoinRoom(Socket current, string roomID, string roomPassword)
     {
-        Debug.Log($"Attempting to join session with room ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
-        Debug.Log($"Active Sessions count before join attempt: {activeSessions.Count}");
-       
-        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        try
         {
-            if (roomPassword==session.Password)
+            Debug.Log($"Attempting to join session with room ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+            Debug.Log($"Active Sessions count before join attempt: {activeSessions.Count}");
+
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
             {
-                canJoinRoom = true;
-                if (session.HostSocket != current)
+                if (roomPassword == session.Password)
                 {
-                    session.NonHostSocket = current; // Assign non-host client
+                    canJoinRoom = true;
+                    if (session.HostSocket != current)
+                    {
+                        session.NonHostSocket = current; // Assign non-host client
+                    }
+                    session.MemberSockets.Add(current); // Add the client to the room's member list
+                    nonHostClientID = current.RemoteEndPoint.ToString().Split(":")[1];
+                    SendMessage(current, $"SetNonHostClientId:{nonHostClientID}");
+                    BroadcastMessageToSession(session, $"SetNonHostClientId:{nonHostClientID}");
+                    tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
+
+                    Debug.Log($"The non-host client id is {nonHostClientID}");
+                    Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
+                    SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
+                    SyncCharacterSelectionState(current, session);
                 }
-                session.MemberSockets.Add(current); // Add the client to the room's member list
-                nonHostClientID=current.RemoteEndPoint.ToString().Split(":")[1];
-                SendMessage(current, $"SetNonHostClientId:{nonHostClientID}");
-                BroadcastMessageToSession(session, $"SetNonHostClientId:{nonHostClientID}");
-                tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
-                udpClientEndpoints.Add((IPEndPoint)current.RemoteEndPoint);
-                Debug.Log($"The non-host client id is {nonHostClientID}");
-                Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
-                SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
-                SyncCharacterSelectionState(current, session);
+                else
+                {
+                    // Client provided the wrong password
+                    canJoinRoom = false;
+                    SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
+                }
+
             }
             else
             {
-                // Client provided the wrong password
-               canJoinRoom=false;
-                SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
+               
+                canJoinRoom = false;
+                SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
             }
-           
         }
-        else
+        catch (Exception e)
         {
-            //Debug.Log($"Active Sessions: {string.Join(", ", activeSessions.Keys)}");
-            canJoinRoom = false;
-            SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
+            if (e is SocketException || e is Exception)
+            {
+                Debug.LogError($"Fail to join room {roomID} due to {e}");
+            }
         }
+        finally
+        {
+            Debug.Log($"Attempting to join session with room ID: {roomID}, Active Sessions: {string.Join(", ", activeSessions.Keys)}");
+            Debug.Log($"Active Sessions count before join attempt: {activeSessions.Count}");
+
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+                if (roomPassword == session.Password)
+                {
+                    canJoinRoom = true;
+                    if (session.HostSocket != current)
+                    {
+                        session.NonHostSocket = current; // Assign non-host client
+                    }
+                    session.MemberSockets.Add(current); // Add the client to the room's member list
+                    nonHostClientID = current.RemoteEndPoint.ToString().Split(":")[1];
+                    SendMessage(current, $"SetNonHostClientId:{nonHostClientID}");
+                    BroadcastMessageToSession(session, $"SetNonHostClientId:{nonHostClientID}");
+                    tcpIdToUdpEndpoint[nonHostClientID] = (IPEndPoint)current.RemoteEndPoint;
+
+                    Debug.Log($"The non-host client id is {nonHostClientID}");
+                    Debug.Log($"Client joined room {roomID}. Number of MemberSockets after joining: {session.MemberSockets.Count}");
+                    SendMessage(current, $"JoinRoom Accepted:{roomID}:{roomPassword}");
+                    SyncCharacterSelectionState(current, session);
+                }
+                else
+                {
+                    // Client provided the wrong password
+                    canJoinRoom = false;
+                    SendMessage(current, "JoinRoom Request Rejected:Incorrect Password");
+                }
+
+            }
+            else
+            {
+
+                canJoinRoom = false;
+                SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
+            }
+        }
+       
 
 
     }
@@ -643,6 +724,13 @@ public class GameServer : MonoBehaviour
                     BroadcastMessageToSessionMembers(session6, text, current);
                 }
                 break;
+            case "GameEnds":
+                Debug.Log("The game ends!");
+                var session7 = FindSessionByClient(current);
+                if (session7 != null)
+                {
+                    BroadcastMessageToSessionMembers(session7, text, current);
+                }break;
             default:
                 Debug.Log($"Unknown command received: {commandType}");
                 break;
@@ -755,60 +843,136 @@ public class GameServer : MonoBehaviour
     }
     private void SetHostCharacterReady(Socket current, string roomID, string characterName, bool isReady)
     {
-        
-        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        try
         {
-                               
-            Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
-            if (IsHost(current, roomID))
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
             {
-                string readinessFlag = isReady ? "Ready" : "NotReady";
-                string memberIdentityFlag = $"Host";
-                string clientIdentifier = GetClientIdentifier(current);
-                string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
-                SendMessage(current, $"SetHostClientId:{uniqueClientId[1]}");
-                string message = $"HostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
-                Debug.Log($"Current client identifier is {clientIdentifier}.");
-                Debug.Log($"Character readiness update: {message}");
-                BroadcastMessageToSession(session, message);
 
-                NotifyHostClientsOfCharacterSelections(session);
+                Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
+                if (IsHost(current, roomID))
+                {
+                    string readinessFlag = isReady ? "Ready" : "NotReady";
+                    string memberIdentityFlag = $"Host";
+                    string clientIdentifier = GetClientIdentifier(current);
+                    string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                    SendMessage(current, $"SetHostClientId:{uniqueClientId[1]}");
+                    string message = $"HostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                    Debug.Log($"Current client identifier is {clientIdentifier}.");
+                    Debug.Log($"Character readiness update: {message}");
+                    BroadcastMessageToSession(session, message);
+
+                    NotifyHostClientsOfCharacterSelections(session);
+                }
+
             }
-           
+            else
+            {
+                Debug.Log($"Error: Session with ID {roomID} does not exist.");
+                SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+            }
         }
-        else
+        catch( Exception e )
         {
-            Debug.Log($"Error: Session with ID {roomID} does not exist.");
-            SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+            if(e is Exception)
+            {
+                Debug.LogError($"Failed to set host player ready due to {e}.");
+            }
         }
+        finally
+        {
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+
+                Debug.Log($"number of ready clients: {session.NumberOfReadyClients}");
+                if (IsHost(current, roomID))
+                {
+                    string readinessFlag = isReady ? "Ready" : "NotReady";
+                    string memberIdentityFlag = $"Host";
+                    string clientIdentifier = GetClientIdentifier(current);
+                    string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                    SendMessage(current, $"SetHostClientId:{uniqueClientId[1]}");
+                    string message = $"HostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                    Debug.Log($"Current client identifier is {clientIdentifier}.");
+                    Debug.Log($"Character readiness update: {message}");
+                    BroadcastMessageToSession(session, message);
+
+                    NotifyHostClientsOfCharacterSelections(session);
+                }
+
+            }
+            else
+            {
+                Debug.Log($"Error: Session with ID {roomID} does not exist.");
+                SendMessage(current, $"Error:Session with ID {roomID} does not exist.");
+            }
+        }
+      
     }
     
     private void SetNonHostCharacterReady(Socket current, string roomID, string characterName, bool isReady)
     {
-        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        try
         {
-           
-            Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
-            
-           
-            if (!IsHost(current, roomID))
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
             {
-                string readinessFlag = isReady ? "Ready" : "NotReady";
-                string memberIdentityFlag = $"Member";
-                string clientIdentifier = GetClientIdentifier(current);
-                string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
-                SendMessage(current, $"SetNonHostClientId:{uniqueClientId[1]}");
-                BroadcastMessageToSession(session, $"SetNonHostClientId:{uniqueClientId[1]}");
-                string msg = $"NonHostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
-                Debug.Log($"Current client identifier is {clientIdentifier}.");
-                Debug.Log($"Character readiness update: {msg}");
-                BroadcastMessageToSession(session, msg);
 
-                NotifyNonHostClientsOfCharacterSelections(session);
-                        
+                Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
+
+
+                if (!IsHost(current, roomID))
+                {
+                    string readinessFlag = isReady ? "Ready" : "NotReady";
+                    string memberIdentityFlag = $"Member";
+                    string clientIdentifier = GetClientIdentifier(current);
+                    string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                    SendMessage(current, $"SetNonHostClientId:{uniqueClientId[1]}");
+                    BroadcastMessageToSession(session, $"SetNonHostClientId:{uniqueClientId[1]}");
+                    string msg = $"NonHostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                    Debug.Log($"Current client identifier is {clientIdentifier}.");
+                    Debug.Log($"Character readiness update: {msg}");
+                    BroadcastMessageToSession(session, msg);
+
+                    NotifyNonHostClientsOfCharacterSelections(session);
+
+                }
+
             }
-            
         }
+        catch(Exception e)
+        {
+            if(e is Exception||e is SocketException)
+            {
+                Debug.LogError($"Failed to set non-host player ready because of {e}.");
+            }
+        }
+        finally
+        {
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+
+                Debug.Log($"Current Socket: {current.RemoteEndPoint}, Host Socket: {session.HostSocket.RemoteEndPoint}");
+
+
+                if (!IsHost(current, roomID))
+                {
+                    string readinessFlag = isReady ? "Ready" : "NotReady";
+                    string memberIdentityFlag = $"Member";
+                    string clientIdentifier = GetClientIdentifier(current);
+                    string[] uniqueClientId = current.RemoteEndPoint.ToString().Split(":");
+                    SendMessage(current, $"SetNonHostClientId:{uniqueClientId[1]}");
+                    BroadcastMessageToSession(session, $"SetNonHostClientId:{uniqueClientId[1]}");
+                    string msg = $"NonHostCharacterReadyUpdate:{roomID}:{characterName}:{readinessFlag}:{memberIdentityFlag}:{clientIdentifier}";
+                    Debug.Log($"Current client identifier is {clientIdentifier}.");
+                    Debug.Log($"Character readiness update: {msg}");
+                    BroadcastMessageToSession(session, msg);
+
+                    NotifyNonHostClientsOfCharacterSelections(session);
+
+                }
+
+            }
+        }
+       
     }
    
     private void BroadcastStartGame(GameSession session)
@@ -1295,20 +1459,48 @@ public class GameServer : MonoBehaviour
 
     private void InstantiateCharacter(Socket current, string roomID, string characterName)
     {
-        if (activeSessions.TryGetValue(roomID, out GameSession session))
+        try
         {
-            Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
-            string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
-            BroadcastMessageToSession(session, instantiationMsgForHost);
-            // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+                Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
+                string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForHost);
+                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
 
 
-            Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
-            string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
-            BroadcastMessageToSession(session, instantiationMsgForNonHost);
-            //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
+                Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+                string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForNonHost);
+                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
 
+            }
         }
+        catch(Exception e)
+        {
+            if(e is Exception)
+            {
+                Debug.LogError($"Character instantiation failed due to {e}.");
+            }
+        }
+        finally
+        {
+            if (activeSessions.TryGetValue(roomID, out GameSession session))
+            {
+                Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
+                string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForHost);
+                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
+
+
+                Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
+                string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
+                BroadcastMessageToSession(session, instantiationMsgForNonHost);
+                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
+
+            }
+        }
+       
     }
     
     private void ResendInstantiationRequest(Socket current, string roomID, string characterName) //Please reflect this in the client side so that it ensures re-sending the character instantiation messages
@@ -1356,83 +1548,5 @@ public class GameServer : MonoBehaviour
         
     }
 
-    /* #region Set up UDP Server
-    public void StartUDPServer()
-    {
-        udpServer = new UdpClient(udpPort);  // Initialize UDP Server
-        udpEndPoint = new IPEndPoint(IPAddress.Parse(GameClient.Instance.serverIp), udpPort);  // Bind to the UDP port
-        Debug.Log($"UDP Server started on port {udpPort} with end point {udpEndPoint}");
-
-        StartListeningUDP();  // Begin listening for incoming data
-    }
-
-    private void StartListeningUDP()
-    {
-        udpServer.BeginReceive(ReceiveUDP, null);
-        Debug.Log("UDP Server listening for messages.");
-    }
-
-    private void ReceiveUDP(IAsyncResult result)
-    {
-        try
-        {
-            IPEndPoint senderEndPoint = new IPEndPoint(IPAddress.Any, 0);  // Temporary endpoint to store sender's address
-
-            // Receive data and capture sender's endpoint
-            byte[] receivedData = udpServer.EndReceive(result, ref senderEndPoint);
-            string receivedMessage = Encoding.ASCII.GetString(receivedData);
-
-            Debug.Log($"Received UDP message from {senderEndPoint}: {receivedMessage}");
-
-            // Handle the received message based on its content
-           ProcessReceivedUDPMessage(receivedMessage, senderEndPoint);
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error in receiving UDP data: {ex.Message}");
-        }
-        finally
-        {
-            StartListeningUDP();
-        }
-    }
-    private void ProcessReceivedUDPMessage(string message, IPEndPoint sender)
-    {
-        if (message.StartsWith("HostAttack") || message.StartsWith("NonHostAttack"))
-        {
-            // Specific processing for HostAttack and NonHostAttack messages
-            HandleAttackMessages(message, sender);
-            SendUDPResponse(message, sender);
-        }
-        
-    }
-
-    private void HandleAttackMessages(string message, IPEndPoint sender)
-    {
-        Debug.Log($"Handling attack message: {message}+{sender}");
-
-        // Additional logic to process attack messages
-        // Example: Update game state, notify other clients, etc.
-    }
-    private void BroadcastUDPMessage(string message, IPEndPoint senderEndPoint)
-    {
-        byte[] data = Encoding.UTF8.GetBytes(message);
-
-        foreach (var clientEndPoint in udpClientEndpoints)
-        {
-            if (!clientEndPoint.Equals(senderEndPoint)) // Avoid sending back to the sender
-            {
-                udpServer.Send(data, data.Length, clientEndPoint);
-            }
-        }
-    }
-
-    private void SendUDPResponse(string responseMessage, IPEndPoint endPoint)//Test function to send messages
-    {
-        byte[] data = Encoding.ASCII.GetBytes(responseMessage);
-        udpServer.Send(data, data.Length, endPoint);
-        Debug.Log($"Sent UDP response to {endPoint}: {responseMessage}");
-    }
-    #endregion*/
 
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 using UnityEngine.UI;
-public class BanditAnimatorController : MonoBehaviour
+public class BanditAnimatorController : MonoBehaviour //This class syncs the animations and collision logics between players`
 {
     public Animator anim;
     public BanditScript banditScript;
@@ -11,9 +11,9 @@ public class BanditAnimatorController : MonoBehaviour
     public bool isLocalPlayer = false;
     public string attackMsg=string.Empty;
     public float health = 100;
-    public float damageAmount = 10,localDamageAmount=5;
+    public float damageAmount = 10,localDamageAmount=6f;
     public SpriteRenderer sprite;
-    private SpriteRenderer opponentSprite;
+    public SpriteRenderer opponentSprite;
     public float colorChangeDuration = 1f;
     public Slider healthSlider;
     public BanditAnimatorController opponentBandit;
@@ -97,35 +97,34 @@ public class BanditAnimatorController : MonoBehaviour
         {
             opponentCollider = collision;
             opponentSprite=collision.gameObject.GetComponent<BanditAnimatorController>().sprite;
-            
-            if(isLocalPlayer)
-            collision.gameObject.GetComponent<BanditAnimatorController>().health -= damageAmount/1.35f;
-            else
-            collision.gameObject.GetComponent<BanditAnimatorController>().health-= damageAmount;
 
 
-            if(gameObject.GetComponent<BanditScript>().gameClient.isHost)
+            if (distanceToOpponent <= 150.0f)
             {
-                string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";
-                banditScript.gameClient.SendMessageToServer(damageMsgFromHost);
-            }
-            else
-            {
-                string damageMsgFromNonHost = $"NonHostApplyDamage:{damageAmount}";
-                banditScript.gameClient.SendMessageToServer(damageMsgFromNonHost);
+                if (gameObject.GetComponent<BanditScript>().gameClient.isHost)
+                {
+                    string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";
+                    banditScript.gameClient.SendMessageToServer(damageMsgFromHost);
+                }
+                else
+                {
+                    string damageMsgFromNonHost = $"NonHostApplyDamage:{damageAmount}";
+                    banditScript.gameClient.SendMessageToServer(damageMsgFromNonHost);
+                }
+
+                opponentSprite.color = Color.red;
+
+                StartCoroutine(RecoverColorAfterTakingDamage());
+
+                UpdateHealth();
             }
           
-            opponentSprite.color = Color.red;
-
-            StartCoroutine(RecoverColorAfterTakingDamage());
-
-            UpdateHealth();
 
            
         }
     }
 
-    private IEnumerator RecoverColorAfterTakingDamage()
+    public  IEnumerator RecoverColorAfterTakingDamage()
     {
         if(opponentSprite!=null)
         {
@@ -151,10 +150,14 @@ public class BanditAnimatorController : MonoBehaviour
         {
             healthSlider.value = health/100.0f;
         }
-
+        
         if (health <= 0)
         {
             anim.SetTrigger("Die");
+            banditScript.enabled = false;
+            string endMsg = $"GameEnds:";
+            banditScript.gameClient.SendMessageToServer(endMsg);
+           
         }
     }
 
