@@ -282,7 +282,7 @@ public class BanditScript : MonoBehaviour
 
     void Attack()
     {
-        //anim.SetTrigger("Attack");
+        anim.SetTrigger("Attack");
         banditActionState = BanditActionState.Attack;
 
 
@@ -294,6 +294,7 @@ public class BanditScript : MonoBehaviour
             gameClient.SendMessageToServer(attackMsg);
             //SendStateChangeMessage();
             gameServer.hostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(attackMessage);
+           
         }
         else
         {
@@ -301,6 +302,7 @@ public class BanditScript : MonoBehaviour
             //gameClient.SendUDPMessage(attackMsg,gameServer.udpEndPoint);           
             gameClient.SendMessageToServer(attackMsg);
             gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().anim.SetTrigger(attackMessage);
+            
         }
 
     }
