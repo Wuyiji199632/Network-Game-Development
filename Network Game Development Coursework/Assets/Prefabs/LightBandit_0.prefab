@@ -528,7 +528,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 400
   jumpForce: 200
-  anim: {fileID: 0}
+  anim: {fileID: 286248004}
   isJumping: 0
   groundLayer:
     serializedVersion: 2
@@ -542,6 +542,10 @@ MonoBehaviour:
   isHost: 0
   hostHorizontalInput: 0
   nonHostHorizontalInput: 0
+  banditAnimController: {fileID: 0}
+  targetPosition: {x: 0, y: 0, z: 0}
+  targetRotation: {x: 0, y: 0, z: 0, w: 0}
+  smoothingSpeed: 5
   banditActionState: 0
 --- !u!95 &286248004
 Animator:
@@ -581,9 +585,16 @@ MonoBehaviour:
   isLocalPlayer: 0
   attackMsg: 
   health: 100
+  damageAmount: 10
+  localDamageAmount: 6
   sprite: {fileID: 0}
+  opponentSprite: {fileID: 0}
   colorChangeDuration: 1
   healthSlider: {fileID: 448833898968201041}
+  opponentBandit: {fileID: 0}
+  smoothingSpeed: 3
+  opponentCollider: {fileID: 0}
+  distanceToOpponent: 0
 --- !u!1 &7388231745324902087
 GameObject:
   m_ObjectHideFlags: 0

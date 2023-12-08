@@ -81,7 +81,7 @@ public class GameServer : MonoBehaviour
     public BanditScript opponentBandit = null;
     public Dictionary<string, IPEndPoint> tcpIdToUdpEndpoint = new Dictionary<string, IPEndPoint>();
     public BanditScript defeatedBandit = null;
-   
+    public GameClient gameClient;
     private void Awake()
     {
         Instance = this;
@@ -1463,18 +1463,17 @@ public class GameServer : MonoBehaviour
         {
             if (activeSessions.TryGetValue(roomID, out GameSession session))
             {
+               
                 Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
                 string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
                 BroadcastMessageToSession(session, instantiationMsgForHost);
-                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
-
 
                 Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
                 string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
                 BroadcastMessageToSession(session, instantiationMsgForNonHost);
-                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
 
             }
+
         }
         catch(Exception e)
         {
@@ -1487,16 +1486,16 @@ public class GameServer : MonoBehaviour
         {
             if (activeSessions.TryGetValue(roomID, out GameSession session))
             {
+                
                 Debug.Log($"Instantiating {characterName} for the host in room {roomID}!");
                 string instantiationMsgForHost = $"InstantiateCharacterForHost:{roomID}:{characterName}";
                 BroadcastMessageToSession(session, instantiationMsgForHost);
-                // SendReliableMessage(session.HostSocket, instantiationMsgForHost);
-
 
                 Debug.Log($"Instantiating {characterName} for the non-host client in room {roomID}!");
                 string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
                 BroadcastMessageToSession(session, instantiationMsgForNonHost);
-                //SendReliableMessage(session.NonHostSocket, instantiationMsgForNonHost);
+
+               
 
             }
         }

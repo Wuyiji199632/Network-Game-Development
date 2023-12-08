@@ -11,7 +11,7 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
     public bool isLocalPlayer = false;
     public string attackMsg=string.Empty;
     public float health = 100;
-    public float damageAmount = 10,localDamageAmount=10f;
+    public float damageAmount = 10,localDamageAmount=6f;
     public SpriteRenderer sprite;
     public SpriteRenderer opponentSprite;
     public float colorChangeDuration = 1f;
@@ -98,29 +98,29 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
             opponentCollider = collision;
             opponentSprite=collision.gameObject.GetComponent<BanditAnimatorController>().sprite;
 
-            if(opponentCollider!=null)
+
+            if (distanceToOpponent <= 150.0f)
             {
-                if (distanceToOpponent <= 150.0f)
+                if (gameObject.GetComponent<BanditScript>().gameClient.isHost)
                 {
-                    if (gameObject.GetComponent<BanditScript>().gameClient.isHost)
-                    {
-                        string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";
-                        banditScript.gameClient.SendMessageToServer(damageMsgFromHost);
-                    }
-                    else
-                    {
-                        string damageMsgFromNonHost = $"NonHostApplyDamage:{damageAmount}";
-                        banditScript.gameClient.SendMessageToServer(damageMsgFromNonHost);
-                    }
-
-                    opponentSprite.color = Color.red;
-
-                    StartCoroutine(RecoverColorAfterTakingDamage());
-
-                    UpdateHealth();
+                    string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";
+                    banditScript.gameClient.SendMessageToServer(damageMsgFromHost);
                 }
+                else
+                {
+                    string damageMsgFromNonHost = $"NonHostApplyDamage:{damageAmount}";
+                    banditScript.gameClient.SendMessageToServer(damageMsgFromNonHost);
+                }
+
+                opponentSprite.color = Color.red;
+
+                StartCoroutine(RecoverColorAfterTakingDamage());
+
+                UpdateHealth();
             }
-                          
+          
+
+           
         }
     }
 

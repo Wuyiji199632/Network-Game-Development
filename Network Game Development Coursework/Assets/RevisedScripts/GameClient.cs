@@ -126,7 +126,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private float predictedInterpolation;
 
-   
+    public bool instantiationMsgReceivedForHost = false, instantiationMsgReceivedForNonHost = false;
    
     private void Awake()
     {
@@ -751,7 +751,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void ProcessNonHostCharacterInstantiation(string msg)
     {
         string[] splitMessage = msg.Split(':');
-
+        instantiationMsgReceivedForNonHost = true;
         if (splitMessage.Length >= 3)
         {
             if (instantiateHostForNonhost)
@@ -781,7 +781,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 {
                     instantiatedBandit.GetComponent<BanditScript>().playerID = localNonHostClientId;
                     gameServer.nonHostBandit = instantiatedBandit.GetComponent<BanditScript>();
-                  
+
                     // Set opponentBandit for the host client
                     if (isHost)
                     {
@@ -796,7 +796,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void ProcessHostCharacterInstantiation(string msg)
     {
         string[] splitMessage = msg.Split(':');
-
+        instantiationMsgReceivedForHost = true;
         if (splitMessage.Length >= 2)
         {
             if (instantiateNonhostCharForHost)
@@ -824,7 +824,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
                 if (instantiatedBandit != null)
                 {
-                    instantiatedBandit.GetComponent<BanditScript>().playerID = localHostClientId;                  
+                    instantiatedBandit.GetComponent<BanditScript>().playerID = localHostClientId;
                     gameServer.hostBandit = instantiatedBandit.GetComponent<BanditScript>();
 
                     // Set opponentBandit for the non-host client
@@ -835,6 +835,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 }
             }
         }
+
     }
 
     private void SendInstantiationConfirmation(string clientType, string roomID) //Check to see if the instantiation messages are received correctly

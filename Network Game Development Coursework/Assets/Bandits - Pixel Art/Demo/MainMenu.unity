@@ -2742,7 +2742,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a92b9193ff7ac44188da2a461a2ebd3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  consoleText: {fileID: 1669487197}
+  consoleText: {fileID: 0}
 --- !u!114 &539751642
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3623,7 +3623,7 @@ MonoBehaviour:
   isRunning: 0
   joinRoomDecision: 0
   tcpPort: 8888
-  udpPort: 8889
+  udpPort: 8899
   startGameBtn: {fileID: 715521850}
   quitGameBtn: {fileID: 1457077997}
   createRoomBtn: {fileID: 1253598546}
@@ -3650,6 +3650,8 @@ MonoBehaviour:
   hostBandit: {fileID: 0}
   nonHostBandit: {fileID: 0}
   opponentBandit: {fileID: 0}
+  defeatedBandit: {fileID: 0}
+  gameClient: {fileID: 1361306641}
 --- !u!1 &821012153
 GameObject:
   m_ObjectHideFlags: 0
@@ -5578,10 +5580,12 @@ MonoBehaviour:
   remoteNonHostHorizontalInput: 0
   remoteHostAttackMsg: 
   remoteNonHostAttackMsg: 
-  movementSmoothing: 10
-  positionLerpRate: 10000
+  movementSmoothing: 0.1
+  positionLerpRate: 1000
   hostApplyingDamage: 0
   nonHostApplyingDamage: 0
+  instantiationMsgReceivedForHost: 0
+  instantiationMsgReceivedForNonHost: 0
 --- !u!4 &1361306642
 Transform:
   m_ObjectHideFlags: 0
