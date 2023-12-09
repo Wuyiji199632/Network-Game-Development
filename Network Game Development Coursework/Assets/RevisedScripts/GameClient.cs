@@ -816,6 +816,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     private void ProcessHostCharacterInstantiation(string msg)
     {
+        if (instantiationMsgReceivedForHost) return;
         string[] splitMessage = msg.Split(':');
         
         if (splitMessage.Length >= 3&&!instantiationMsgReceivedForHost)
@@ -859,8 +860,38 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         }
 
     }
+    private void InstantiateCharacter(string characterName, bool isHost)
+    {
+        Vector3 spawnPos = spawnPoint.position;
+        spawnPos.z = 0;
 
-  
+        GameObject instantiatedBandit = null;
+        switch (characterName)
+        {
+            case "LightBandit":
+                instantiatedBandit = Instantiate(lightBandit, spawnPos, Quaternion.identity);
+                break;
+            case "HeavyBandit":
+                instantiatedBandit = Instantiate(heavyBandit, spawnPos, Quaternion.identity);
+                break;
+                // Add other cases as needed
+        }
+
+        if (instantiatedBandit != null)
+        {
+            instantiatedBandit.GetComponent<BanditScript>().playerID = isHost ? localHostClientId : localNonHostClientId;
+            if (isHost)
+            {
+                gameServer.hostBandit = instantiatedBandit.GetComponent<BanditScript>();
+            }
+            else
+            {
+                gameServer.nonHostBandit = instantiatedBandit.GetComponent<BanditScript>();
+            }
+        }
+    }
+
+
 
     // Update the readiness UI for the opponent client
     private void UpdateHostReadinessInfo(string characterName, string readinessFlag,string clientIdentifier)
