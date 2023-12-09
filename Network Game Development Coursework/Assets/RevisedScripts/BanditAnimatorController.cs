@@ -12,6 +12,7 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
     public string attackMsg=string.Empty;
     public float health = 100;
     public float damageAmount = 10,localDamageAmount=6f;
+    public float predictedDamageInterpolationAmount = 0.5f;
     public SpriteRenderer sprite;
     public SpriteRenderer opponentSprite;
     public float colorChangeDuration = 1f;
@@ -89,8 +90,6 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
     #endregion
 
 
-
-
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if(collision.gameObject.GetComponent<BanditAnimatorController>()!=null)
@@ -98,9 +97,10 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
             opponentCollider = collision;
             opponentSprite=collision.gameObject.GetComponent<BanditAnimatorController>().sprite;
 
-
+            opponentCollider.GetComponent<BanditAnimatorController>().health +=predictedDamageInterpolationAmount;
             if (distanceToOpponent <= 150.0f)
             {
+                
                 if (gameObject.GetComponent<BanditScript>().gameClient.isHost)
                 {
                     string damageMsgFromHost = $"HostApplyDamage:{damageAmount}";

@@ -647,6 +647,7 @@ public class GameServer : MonoBehaviour
                     }
                 }
                 break;
+                
             case "CharacterPrep":
                 if (splitData.Length == 3)
                 {
@@ -656,7 +657,15 @@ public class GameServer : MonoBehaviour
                     InstantiateCharacter(current, roomID, characterName);
                 }
                 break;
+            case "ResendInstantiationRequest":
+                if (splitData.Length == 3)
+                {
+                    string roomID = splitData[1];
+                    string characterName = splitData[2];
 
+                    InstantiateCharacter(current, roomID, characterName);
+                }
+                break;
             case "HostMovement":
                              
                 Debug.Log($"Host is moving.");
@@ -1452,6 +1461,7 @@ public class GameServer : MonoBehaviour
             //SendMessage(current, startGameMsg);
             BroadcastMessageToSession(session, startGameMsg);
 
+          
         }
             
     }

@@ -127,7 +127,15 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private float predictedInterpolation;
 
     public bool instantiationMsgReceivedForHost = false, instantiationMsgReceivedForNonHost = false;
-   
+
+    #region Resovlve Packet Loss
+
+    private float instantiationCheckTimer = 0f;
+    private const float InstantiationRetryInterval = 5f; // Retry every 5 seconds
+    private bool instantiationRequestSent = false;
+
+    #endregion
+
     private void Awake()
     {
        
@@ -160,7 +168,24 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             StartCoroutine(DisableText());
         }
-           
+
+        #region Timer Mechanism For Re-instantiation of Characters For Resolving Packet Loss
+
+        if (!CharacterIsInstantiated() && instantiationRequestSent)
+        {
+            // Increment the timer
+            instantiationCheckTimer += Time.deltaTime;
+
+            // If the timer exceeds the retry interval, resend the instantiation request
+            if (instantiationCheckTimer >= InstantiationRetryInterval)
+            {
+                HandleResendInstantiationRequest();
+                instantiationCheckTimer = 0f; // Reset the timer
+            }
+        }
+
+        #endregion
+
     }
     private IEnumerator DisableText()
     {
@@ -460,6 +485,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             try
             {
                 ProcessHostCharacterInstantiation(message);
+                OnCharacterInstantiation();
+
             }
             catch (Exception e)
             {
@@ -471,14 +498,18 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             finally
             {
                 ProcessHostCharacterInstantiation(message);
+                OnCharacterInstantiation();
+
             }
            
         }
-        else if (message.StartsWith("InstantiateCharacterForNonHost:"))
+        if (message.StartsWith("InstantiateCharacterForNonHost:"))
         {
             try
             {
                 ProcessNonHostCharacterInstantiation(message);
+                OnCharacterInstantiation();
+
             }
             catch(Exception e)
             {
@@ -490,6 +521,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             finally
             {
                 ProcessNonHostCharacterInstantiation(message);
+                OnCharacterInstantiation();
+
             }
         }
        // Add any logics needed when a message is received here
@@ -532,7 +565,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                 Vector2 position = new Vector3(posX, posY);
                 Quaternion rotation = Quaternion.Euler(0, rotY, 0);
 
-                UpdateOpponentCharacter(position, rotation);
+                UpdateOpponentCharacterPositions(position, rotation);
 
 
             }
@@ -625,8 +658,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     }
                 }
             }
-            
-          
+                    
         }
 
         if (message.StartsWith("HostAttack:"))
@@ -664,10 +696,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             if(gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider!=null)
             {
 
-                predictedInterpolation = UnityEngine.Random.Range(0.5f, 1.5f);
+                
                 if (gameServer.hostBandit.GetComponent<BanditAnimatorController>().distanceToOpponent <= 150.0f)
                 {
-                   
+
                     if (gameServer.hostBandit.GetComponent<BanditAnimatorController>().isLocalPlayer)
                     {
                         gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.hostBandit.GetComponent<BanditAnimatorController>().localDamageAmount; 
@@ -678,9 +710,9 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     {
                         gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.hostBandit.GetComponent<BanditAnimatorController>().damageAmount;
                     }
-                }
 
-               
+                   
+                }
 
                 gameServer.hostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
             }
@@ -689,10 +721,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider != null)
             {
-                predictedInterpolation = UnityEngine.Random.Range(0.5f, 1.5f);
+               
                 if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().distanceToOpponent <= 150.0f)
                 {
-                   
+
                     if (gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().isLocalPlayer)
                     {
                         gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().localDamageAmount;
@@ -702,6 +734,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                     {
                         gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider.gameObject.GetComponent<BanditAnimatorController>().health -= gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().damageAmount;
                     }
+
+                   
                 }
                 gameServer.nonHostBandit.GetComponent<BanditAnimatorController>().opponentCollider = null;
             }
@@ -716,23 +750,8 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
 
     }
-    private void UpdateOpponentAnimations(float horizontalInput)
-    {
-        if (gameServer.opponentBandit != null)
-        {
-            if(isHost)
-            {
-                gameServer.opponentBandit.hostHorizontalInput = horizontalInput;
-            }
-            else
-            {
-                gameServer.opponentBandit.nonHostHorizontalInput = horizontalInput;
-            }
-        }
-           
-      
-    }
-    public void UpdateOpponentCharacter(Vector2 position, Quaternion rotation)
+   
+    public void UpdateOpponentCharacterPositions(Vector2 position, Quaternion rotation)
     {
 
         if (gameServer.opponentBandit != null)
@@ -751,9 +770,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void ProcessNonHostCharacterInstantiation(string msg)
     {
         string[] splitMessage = msg.Split(':');
-        instantiationMsgReceivedForNonHost = true;
-        if (splitMessage.Length >= 3)
+       
+        if (splitMessage.Length >= 3 && !instantiationMsgReceivedForNonHost)
         {
+            instantiationMsgReceivedForNonHost = true;
             if (instantiateHostForNonhost)
             {
                 instantiateHostForNonhost = false;
@@ -796,9 +816,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     private void ProcessHostCharacterInstantiation(string msg)
     {
         string[] splitMessage = msg.Split(':');
-        instantiationMsgReceivedForHost = true;
-        if (splitMessage.Length >= 2)
+        
+        if (splitMessage.Length >= 3&&!instantiationMsgReceivedForHost)
         {
+            instantiationMsgReceivedForHost = true;
             if (instantiateNonhostCharForHost)
             {
                 instantiateNonhostCharForHost = false;
@@ -838,12 +859,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
     }
 
-    private void SendInstantiationConfirmation(string clientType, string roomID) //Check to see if the instantiation messages are received correctly
-    {
-        string confirmationMessage = $"InstantiationConfirmation:{clientType}:{roomID}";
-        SendMessageToServer(confirmationMessage);
-    }
-    // Update the readiness UI for the local client
+  
 
     // Update the readiness UI for the opponent client
     private void UpdateHostReadinessInfo(string characterName, string readinessFlag,string clientIdentifier)
@@ -881,7 +897,35 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
        
 
     }
-   
+    private void HandleResendInstantiationRequest()
+    {
+        if (!string.IsNullOrEmpty(selectedCharacter))
+        {
+            Debug.Log("Resending character instantiation request.");
+            SendMessageToServer($"ResendInstantiationRequest:{roomID}:{selectedCharacter}");
+            instantiationRequestSent = true; // Mark that a request has been sent
+        }
+    }
+    public void OnCharacterInstantiation()
+    {
+        // Reset the timer and the request sent flag when the character is instantiated
+        instantiationCheckTimer = 0f;
+        instantiationRequestSent = false;
+    }
+    private bool CharacterIsInstantiated()
+    {
+        if ((isHost && gameServer.hostBandit != null && gameServer.hostBandit.GetComponent<BanditScript>().playerID == localHostClientId))
+        {
+            return true;
+        }
+        
+        if (!isHost && gameServer.nonHostBandit != null && gameServer.nonHostBandit.GetComponent<BanditScript>().playerID == localNonHostClientId)
+        {
+            return true;
+        }
+        return false;
+       
+    }
     public bool IsLocal()
     {
         return localHostClientId == gameServer.hostClientID || localNonHostClientId == gameServer.nonHostClientID;
