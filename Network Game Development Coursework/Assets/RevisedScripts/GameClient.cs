@@ -131,7 +131,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     #region Resovlve Packet Loss
 
     private float instantiationCheckTimer = 0f;
-    private const float InstantiationRetryInterval = 5f; // Retry every 5 seconds
+    private const float InstantiationRetryInterval = 1f; // Retry every 1 seconds
     private bool instantiationRequestSent = false;
 
     #endregion
@@ -171,6 +171,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
 
         #region Timer Mechanism For Re-instantiation of Characters For Resolving Packet Loss
 
+        Debug.Log($"Are characters instantiated? {CharacterIsInstantiated()}.");
         if (!CharacterIsInstantiated() && instantiationRequestSent)
         {
             // Increment the timer
