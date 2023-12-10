@@ -490,13 +490,12 @@ public class GameServer : MonoBehaviour
             Debug.LogError("Invalid command received.");
             return;
         }
-
      
         string commandType = splitData[0];
         switch (commandType)
         {
             case "CreateRoom":
-                if (splitData.Length == 3) // Ensure we have enough parts.
+                if (splitData.Length == 3) // Ensure we have enough parts to store the message received.
                 {
                     CreateRoom(current, splitData[1], splitData[2]);
                     
@@ -1505,8 +1504,7 @@ public class GameServer : MonoBehaviour
                 string instantiationMsgForNonHost = $"InstantiateCharacterForNonHost:{roomID}:{characterName}";
                 BroadcastMessageToSession(session, instantiationMsgForNonHost);
 
-               
-
+              
             }
         }
        
@@ -1556,6 +1554,5 @@ public class GameServer : MonoBehaviour
         Application.Quit();
         
     }
-
 
 }

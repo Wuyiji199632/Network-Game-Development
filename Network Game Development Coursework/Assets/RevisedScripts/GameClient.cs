@@ -206,6 +206,10 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         {
             Debug.Log(ex.Message);
         }
+        finally
+        {
+            clientSocket.BeginConnect(serverIp, serverPortTCP, ConnectCallback, clientSocket);
+        }
     }
 
     private void ConnectCallback(IAsyncResult AR)
@@ -219,6 +223,12 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
         catch (SocketException ex)
         {
             Debug.Log(ex.Message);
+        }
+        finally
+        {
+            clientSocket.EndConnect(AR);
+            Debug.Log("Connected to the server.");
+            clientSocket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, clientSocket);
         }
     }
 
@@ -1029,7 +1039,7 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             unableToJoinTxt.gameObject.SetActive(true);
             unableToJoinTxt.text = $"Socket is not found, fail to join room!";
             ConnectToServer();
-            // You could also call ConnectToServer() here to try to reconnect
+           
         }
     }
 
