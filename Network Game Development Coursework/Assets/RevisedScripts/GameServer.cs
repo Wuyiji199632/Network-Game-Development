@@ -226,7 +226,6 @@ public class GameServer : MonoBehaviour
         current.Close();
     }
    
-
     private void ReceiveCallback(IAsyncResult AR)
     {
         Socket current = (Socket)AR.AsyncState;
@@ -315,7 +314,7 @@ public class GameServer : MonoBehaviour
                 SendMessage(current, $"SetHostClientId:{hostClientID}");
                 BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
                 tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
-
+                currentGameSession = newSession;
                 Debug.Log($"The host client id is {hostClientID}");
                 Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
                 SendMessage(current, $"RoomCreated:{roomID}");
@@ -348,7 +347,7 @@ public class GameServer : MonoBehaviour
                 SendMessage(current, $"SetHostClientId:{hostClientID}");
                 BroadcastMessageToSession(newSession, $"SetHostClientId:{hostClientID}");
                 tcpIdToUdpEndpoint[hostClientID] = (IPEndPoint)current.RemoteEndPoint;
-
+                currentGameSession = newSession;
                 Debug.Log($"The host client id is {hostClientID}");
                 Debug.Log($"Session created. Total active sessions: {activeSessions.Count}");
                 SendMessage(current, $"RoomCreated:{roomID}");
@@ -414,8 +413,16 @@ public class GameServer : MonoBehaviour
             {
                
                 canJoinRoom = false;
-                SendMessage(current, "JoinRoom Request Rejected:Session does not exist");
+                SendMessage(current, "JoinRoom Request Rejected:Session does not exist!");
             }
+
+            if (session.MemberSockets.Count > 2)
+            {
+                canJoinRoom = false;
+                SendMessage(current, "JoinRoom Request Rejected:Room is full!");
+            }
+
+           
         }
         catch (Exception e)
         {
@@ -465,8 +472,6 @@ public class GameServer : MonoBehaviour
             }
         }
        
-
-
     }
     private void ProcessRequestData(Socket current, int received)
     {

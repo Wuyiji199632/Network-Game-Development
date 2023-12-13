@@ -18,7 +18,7 @@ public class PositionInterpolator
     private Queue<Vector3> positionUpdates = new Queue<Vector3>();
     private Vector3 currentPosition;
     private Vector3 targetPosition;
-    private float lerpRate;
+    private float lerpRate;//Adjust as needed
 
     public PositionInterpolator(float lerpRate)
     {
@@ -54,7 +54,7 @@ public class PositionInterpolator
     }
 }
 #endregion
-public class GameClient : MonoBehaviour //This is the class specifying the use of tcp-ip
+public class GameClient : MonoBehaviour 
 {
     public static GameClient Instance;
     private string roomID,roomPassword;
@@ -271,7 +271,6 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
             }
         }
        
-
     }
     private void OnServerMessageReceived(string message)
     {
@@ -296,8 +295,6 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
           
             return; // Exit the method to avoid processing the rest of the function
         }
-
-
 
         if (message.StartsWith("ProcessCharacterSelectionRequest:"))//Non-host client's selection message
         {
@@ -759,7 +756,6 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
                        
         }
 
-
     }
    
     public void UpdateOpponentCharacterPositions(Vector2 position, Quaternion rotation)
@@ -1013,14 +1009,12 @@ public class GameClient : MonoBehaviour //This is the class specifying the use o
     // Call this method when you want to join a room.
     public void SendJoinRoomRequest()
     {
-        
         ResetCharacterSelectionUI();
         string roomID = joinSessionIDField.text;
         string roomPassword = joinSessionPasswordField.text;
         string message = $"JoinRoom:{roomID}:{roomPassword}";
         SendMessageToServer(message);
 
-                   
     }
 
     // This method sends a message to the server.

@@ -52,7 +52,7 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
     // Update is called once per frame
     void Update()
     {
-        AnimPlayLogicsForSync();
+        MovementAnimPlayLogicsForSync();
 
         UpdateHealth();
 
@@ -66,7 +66,7 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
     }
    
 
-    private void AnimPlayLogicsForSync()
+    private void MovementAnimPlayLogicsForSync()
     {
         #region Running Animation Playing Logics
         // Determine the horizontal input based on whether the bandit is local or non-local
@@ -118,9 +118,7 @@ public class BanditAnimatorController : MonoBehaviour //This class syncs the ani
 
                 UpdateHealth();
             }
-          
-
-           
+                    
         }
     }
 
