@@ -1082,7 +1082,7 @@ public class GameClient : MonoBehaviour
         }
     }
 
-    public void GetReadyForBattle()//TODO:Handle the non-host passing of readiness messages
+    public void GetReadyForBattle()
     {
         UnityMainThreadDispatcher.Instance.Enqueue(() =>
         {

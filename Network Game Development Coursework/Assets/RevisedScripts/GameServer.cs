@@ -46,7 +46,7 @@ public class GameServer : MonoBehaviour
     [SerializeField]
     private int tcpPort = 8888;
     [SerializeField]
-    private int udpPort = 8899;
+    private int udpPort = 8899; //Will be used in the future but not in this coursework
     public Button startGameBtn, quitGameBtn, createRoomBtn, createRoomBtn2, joinRoomBtn, joinRoomBtn2;
 
     public Dictionary<string, GameSession> activeSessions=new Dictionary<string, GameSession>();//Dictionary to store the active game sessions
@@ -646,7 +646,7 @@ public class GameServer : MonoBehaviour
                     string characterName = splitData[2];
                     if (IsHost(current, roomID))
                     {
-                        StartGameAndLoadAssignGameCharacters(current, roomID, characterName);
+                        StartGameAndLoadAssignedGameCharacters(current, roomID, characterName);
                         Debug.Log($"Game started in room {roomID}");
                     }
                 }
@@ -1453,7 +1453,7 @@ public class GameServer : MonoBehaviour
     #endregion
 
     #region Start Game Logics
-    private void StartGameAndLoadAssignGameCharacters(Socket current, string roomID, string characterName)
+    private void StartGameAndLoadAssignedGameCharacters(Socket current, string roomID, string characterName)
     {
         //StartUDPServer(); // Start the UDP server
         if (activeSessions.TryGetValue(roomID, out GameSession session))

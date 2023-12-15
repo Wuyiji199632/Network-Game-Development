@@ -72,11 +72,7 @@ public class BanditScript : MonoBehaviour
 
     }
 
-    private void InterpolateMovements()
-    {
-        transform.position = Vector2.Lerp(transform.position, targetPosition, Time.deltaTime * smoothingSpeed);
-        transform.rotation=Quaternion.Lerp(transform.rotation,targetRotation, Time.deltaTime * smoothingSpeed);
-    }
+   
     private void IdentityChecks()// Needs fixing because disabling the BanditScript is not a good idea because the animations can't be played
     {
         if (gameClient.isHost)
